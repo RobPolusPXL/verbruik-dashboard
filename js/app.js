@@ -225,8 +225,9 @@ function energieScherm(soort) {
       ${lijnen(piekReeksen, MND, (v) => `${f2(v)} kW`, 'Maandpiek per jaar')}</section>` : ''}
     <section class="kaart"><div class="kaart-kop"><h2>Sluipverbruik</h2>${sluip ? `<span>laatste ${sluip.nachten} nachten</span>` : ''}</div>
       ${sluip ? `<div class="groot">${f0(sluip.watt)}<small>W</small></div>
-        <p class="uitleg">Wat er 's nachts altijd aanstaat: koelkast, diepvries, router, toestellen op stand-by. Op een jaar is dat ongeveer
-        <b>${f0(sluip.jaarKwh)} kWh</b>${sluip.jaarEur ? ` of <b>${eur0(sluip.jaarEur)}</b>` : ''}, ${f0(sluip.jaarKwh / (y.nu / y.detail.nu.aantalDagen * 365) * 100)}% van je stroomverbruik.</p>`
+        <p class="uitleg">Zoveel verbruikt je huis zelfs 's nachts, als alles uit lijkt: koelkast, diepvries, router, toestellen op stand-by.
+        Die blijven ook overdag aanstaan, dus 24 uur op 24. Op een jaar is dat ongeveer <b>${f0(sluip.jaarKwh)} kWh</b>${sluip.jaarEur ? ` of <b>${eur0(sluip.jaarEur)}</b>` : ''}:
+        <b>${f0(sluip.jaarKwh / (y.nu / y.detail.nu.aantalDagen * 365) * 100)}%</b> van al je stroom gaat naar toestellen die altijd aanstaan.</p>`
         : '<p class="uitleg">Laad je stroomexport met <b>kwartiertotalen</b> (opnieuw) in om je sluipverbruik te zien.</p>'}</section>
     <section class="kaart"><div class="kaart-kop"><h2>Dag en nacht, ${y.jaar}</h2></div>
       ${splitBalk([{ naam: 'Dag', v: dag, kleur: KLEUR.stroom }, { naam: 'Nacht', v: nacht, kleur: '#7A6A2E' }], (v) => `${f0(v)} kWh`)}</section>`;
