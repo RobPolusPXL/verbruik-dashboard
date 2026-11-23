@@ -1,6 +1,7 @@
 // Opslag: Firebase (Auth + Firestore) of, met ?demo in de URL, een lokaal bestand voor testen.
 // Firestore-structuur: users/{uid}/maanden/{YYYY-MM} = { dagen: { 'YYYY-MM-DD': {sd,sn,gm,gk,gbron} },
-//                                                       uren: { 'YYYY-MM-DD': [24 × m³] }, piek: kW }
+//                                                       uren: { 'YYYY-MM-DD': [24 × m³] }, suren: { 'YYYY-MM-DD': [24 × kWh] }, piek: kW }
+// Instellingen: users/{uid}/instellingen/algemeen
 
 const SDK = 'https://www.gstatic.com/firebasejs/10.12.2';
 const DEMO = typeof location !== 'undefined' && new URLSearchParams(location.search).has('demo');
@@ -47,20 +48,21 @@ export async function laadAlles(user) {
     docs = {};
     snap.forEach((d) => { docs[d.id] = d.data(); });
   }
-  const dagen = {}, uren = {}, pieken = {};
+  const dagen = {}, uren = {}, suren = {}, pieken = {};
   for (const [ym, m] of Object.entries(docs)) {
     Object.assign(dagen, m.dagen || {});
     Object.assign(uren, m.uren || {});
+    Object.assign(suren, m.suren || {});
     if (m.piek != null) pieken[ym] = m.piek;
   }
-  return { dagen, uren, pieken };
+  return { dagen, uren, suren, pieken };
 }
 
 // Geparste exports omzetten naar maanddocumenten.
 // bestaand = huidige data (voor de voorrang van dag- boven uurwaarden bij gas, en de hoogste maandpiek).
 export function bouwDocs(imports, bestaand) {
   const perMaand = {};
-  const M = (ym) => (perMaand[ym] ||= { dagen: {}, uren: {} });
+  const M = (ym) => (perMaand[ym] ||= { dagen: {}, uren: {}, suren: {} });
   for (const imp of imports) {
     for (const [d, v] of Object.entries(imp.dagen)) {
       const doel = M(d.slice(0, 7)).dagen;
@@ -77,6 +79,7 @@ export function bouwDocs(imports, bestaand) {
       }
     }
     for (const [d, a] of Object.entries(imp.uren)) M(d.slice(0, 7)).uren[d] = a;
+    for (const [d, a] of Object.entries(imp.suren || {})) M(d.slice(0, 7)).suren[d] = a;
     // Een export die midden in een maand begint, mag een hogere piek van die maand niet overschrijven.
     for (const [ym, p] of Object.entries(imp.pieken)) M(ym).piek = Math.max(p, M(ym).piek ?? 0, bestaand.pieken[ym] ?? 0);
   }
@@ -84,9 +87,11 @@ export function bouwDocs(imports, bestaand) {
   const r3 = (x) => Math.round(x * 1000) / 1000;
   for (const m of Object.values(perMaand)) {
     for (const v of Object.values(m.dagen)) for (const k of ['sd', 'sn', 'gm', 'gk']) if (v[k] != null) v[k] = r3(v[k]);
-    for (const d of Object.keys(m.uren)) m.uren[d] = m.uren[d].map(r3);
+    for (const k of ['uren', 'suren']) {
+      for (const d of Object.keys(m[k])) m[k][d] = m[k][d].map(r3);
+      if (!Object.keys(m[k]).length) delete m[k];
+    }
     if (m.piek != null) m.piek = r3(m.piek);
-    if (!Object.keys(m.uren).length) delete m.uren;
   }
   return perMaand;
 }
@@ -105,4 +110,20 @@ export async function bewaar(user, imports, bestaand) {
     await batch.commit();
   }
   return maanden.length;
+}
+
+// Instellingen (voorschot, afrekeningsmaand, vergelijkingsprijzen)
+export async function laadInstellingen(user) {
+  if (user.demo) {
+    try { return JSON.parse(localStorage.getItem('verbruik-instellingen') || '{}'); } catch { return {}; }
+  }
+  const { db, f } = fb;
+  const snap = await f.getDoc(f.doc(db, 'users', user.uid, 'instellingen', 'algemeen'));
+  return snap.exists() ? snap.data() : {};
+}
+
+export async function bewaarInstellingen(user, data) {
+  if (user.demo) { localStorage.setItem('verbruik-instellingen', JSON.stringify(data)); return; }
+  const { db, f } = fb;
+  await f.setDoc(f.doc(db, 'users', user.uid, 'instellingen', 'algemeen'), data);
 }

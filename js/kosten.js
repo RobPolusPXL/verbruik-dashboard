@@ -3,8 +3,17 @@ import {
   START, CONTRACTEN, VASTE_VERGOEDING, NET, GSC_WKK, HEFFINGEN, MIN_PIEK,
 } from './tarieven.js';
 
-const contractOp = (soort, datum) =>
-  CONTRACTEN[soort].find((c) => datum >= c.van && datum <= c.tot) || null;
+export const contractOp = (soort, datum, schatting = false) =>
+  CONTRACTEN[soort].find((c) => datum >= c.van && datum <= c.tot)
+  || (schatting && datum > CONTRACTEN[soort].at(-1).tot ? CONTRACTEN[soort].at(-1) : null);
+
+// Index van een maand; bij een schatting de laatst gekende waarde als de maand nog niet gepubliceerd is.
+export function indexVan(tabel, ym, schatting = false) {
+  if (tabel[ym] != null) return tabel[ym];
+  if (!schatting) return null;
+  const vorige = Object.keys(tabel).filter((m) => m <= ym).sort().pop();
+  return vorige ? tabel[vorige] : null;
+}
 
 const geldend = (lijst, datum) => {
   let w = null;
@@ -30,7 +39,9 @@ const leeg = () => ({ kwh: 0, energie: 0, net: 0, heffingen: 0, vast: 0, dagen: 
 // dagen: { 'YYYY-MM-DD': { sd, sn, gk } } — stroom dag/nacht kWh, gas kWh.
 // pieken: { 'YYYY-MM': kW }.
 // Geeft per maand { maand, stroom, gas } met bedragen in euro incl. btw, of null als het niet kan.
-export function kostenPerMaand(dagen, pieken) {
+// Met { schatting: true } wordt een ontbrekende index of een contract na het laatste gekende
+// ingevuld met de laatst gekende waarde (voor prognoses).
+export function kostenPerMaand(dagen, pieken, { schatting = false } = {}) {
   const per = {};
   const datums = Object.keys(dagen).filter((d) => d >= START).sort();
   for (const d of datums) {
@@ -41,8 +52,8 @@ export function kostenPerMaand(dagen, pieken) {
     // Stroom
     const kwh = (v.sd ?? 0) + (v.sn ?? 0);
     if (v.sd != null || v.sn != null) {
-      const c = contractOp('stroom', d);
-      const idx = BELPEX_RLP[ym];
+      const c = contractOp('stroom', d, schatting);
+      const idx = indexVan(BELPEX_RLP, ym, schatting);
       if (!c || idx == null) M.stroomOk = false;
       else {
         const net = jaarVan(d, NET.stroom);
@@ -57,8 +68,8 @@ export function kostenPerMaand(dagen, pieken) {
 
     // Gas
     if (v.gk != null) {
-      const c = contractOp('gas', d);
-      const idx = TTF_RLP[ym];
+      const c = contractOp('gas', d, schatting);
+      const idx = indexVan(TTF_RLP, ym, schatting);
       if (!c || (!c.vast && idx == null)) M.gasOk = false;
       else {
         const net = jaarVan(d, NET.gas);

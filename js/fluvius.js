@@ -24,7 +24,8 @@ export function parseFluvius(tekst, bestandsnaam = '') {
   const isGas = kop.includes('Calorische bovenwaarde') || /gas/i.test(bestandsnaam);
   const soort = isGas ? 'gas' : 'stroom';
   const dagen = {};
-  const uren = {};
+  const uren = {};  // gas m³ per uur
+  const suren = {}; // stroom kWh per uur
   const pieken = {};
   let resolutie = null;
   const telling = {}; // aantal ingevulde kwartieren/uren per dag
@@ -52,6 +53,10 @@ export function parseFluvius(tekst, bestandsnaam = '') {
       if (!/^Afname/i.test(reg)) continue;
       const veld = /nacht/i.test(reg) ? 'sn' : 'sd';
       D[veld] = (D[veld] ?? 0) + v;
+      if (resolutie !== 'dag') {
+        const u = parseInt(vt.slice(0, 2), 10);
+        (suren[d] ||= Array(24).fill(0))[u] += v;
+      }
       if (resolutie === 'kwartier') {
         const ym = d.slice(0, 7);
         // kWh per kwartier × 4 = gemiddeld vermogen in kW; dag+nacht vallen nooit in hetzelfde kwartier
@@ -75,7 +80,8 @@ export function parseFluvius(tekst, bestandsnaam = '') {
   if (nodig && (telling[laatste] ?? 0) < nodig) {
     delete dagen[laatste];
     delete uren[laatste];
+    delete suren[laatste];
     tot = Object.keys(dagen).sort().pop() ?? tot;
   }
-  return { soort, resolutie, van, tot, dagen, uren, pieken, aantalDagen: Object.keys(dagen).length };
+  return { soort, resolutie, van, tot, dagen, uren, suren, pieken, aantalDagen: Object.keys(dagen).length };
 }

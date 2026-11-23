@@ -67,8 +67,7 @@ export function gestapeld(kolommen_, fmt, label) {
       const h = (d.waarde / max) * (H - onder - boven);
       y -= h;
       const r = j === k.delen.length - 1 ? 3 : 0;
-      s += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${(h - 1).toFixed(1)}" rx="${r}" fill="${d.kleur}"
-        data-tip="${esc(`${k.label}: ${d.naam} ${fmt(d.waarde)} · totaal ${fmt(tot)}`)}"></rect>`;
+      s += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(0, h - 1).toFixed(1)}" rx="${r}" fill="${d.kleur}"${k.onvolledig ? ' fill-opacity="0.45"' : ''}></rect>`;
     });
     if (i % stap === 0) s += `<text x="${(x + bw / 2).toFixed(1)}" y="${H - 4}" class="as">${esc(k.kort)}</text>`;
   });
@@ -76,7 +75,8 @@ export function gestapeld(kolommen_, fmt, label) {
     const k = kolommen_[i];
     const tot = k.delen.reduce((a, d) => a + (d.waarde || 0), 0);
     if (!tot) return null;
-    return `${k.label}\n${k.delen.filter((d) => d.waarde).map((d) => `${d.naam}: ${fmt(d.waarde)}`).join('\n')}\ntotaal: ${fmt(tot)}`;
+    const delen = k.delen.filter((d) => d.waarde);
+    return `${k.label}${k.onvolledig ? ' (onvolledig)' : ''}\n${delen.map((d) => `${d.naam}: ${fmt(d.waarde)}`).join('\n')}${delen.length > 1 ? `\ntotaal: ${fmt(tot)}` : ''}`;
   });
   return `<svg class="grafiek" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(label)}">${s}</svg>`;
 }
@@ -113,4 +113,19 @@ export function heatmap(rijen, kleurRgb, fmt, label) {
   }</div></div>`).join('');
   return `<div class="heatmap" role="img" aria-label="${esc(label)}">${cellen}
     <div class="hm-as"><span>0u</span><span>6u</span><span>12u</span><span>18u</span><span>24u</span></div></div>`;
+}
+
+// Gemiddelde dag: 24 uurwaarden als lijn met vlak eronder.
+export function dagprofiel(waarden, kleur, fmt, label) {
+  const W = 350, H = 120, onder = 18, boven = 8;
+  const max = Math.max(0.0001, ...waarden) * 1.1;
+  const x = (u) => 8 + u * ((W - 16) / 23);
+  const y = (v) => H - onder - (v / max) * (H - onder - boven);
+  const pts = waarden.map((v, u) => `${x(u).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+  let s = `<polygon points="${x(0).toFixed(1)},${H - onder} ${pts} ${x(23).toFixed(1)},${H - onder}" fill="${kleur}" fill-opacity="0.18"></polygon>`;
+  s += `<polyline points="${pts}" fill="none" stroke="${kleur}" stroke-width="2" stroke-linejoin="round"></polyline>`;
+  [0, 6, 12, 18, 23].forEach((u) => { s += `<text x="${x(u).toFixed(1)}" y="${H - 4}" class="as">${u === 23 ? '23u' : u + 'u'}</text>`; });
+  const breed = (W - 16) / 23;
+  waarden.forEach((v, u) => { s += `<rect class="kolom" x="${(x(u) - breed / 2).toFixed(1)}" y="0" width="${breed.toFixed(1)}" height="${H}" data-tip="${esc(`${u}u–${u + 1}u: gemiddeld ${fmt(v)}`)}"></rect>`; });
+  return `<svg class="grafiek" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(label)}">${s}</svg>`;
 }
