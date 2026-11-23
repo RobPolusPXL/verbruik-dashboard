@@ -76,7 +76,7 @@ main { max-width: 560px; margin: 0 auto; padding: calc(env(safe-area-inset-top) 
 .knop:disabled { opacity: .5; cursor: default; }
 .stappen { margin: 0; padding-left: 20px; font-size: 13px; line-height: 1.6; color: var(--zacht); }
 .importlijst { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; font-size: 12.5px; color: var(--zacht); }
-.importlijst li { background: #1C2129; border-radius: 10px; padding: 10px; }
+.importlijst li { background: #1C2129; border-radius: 10px; padding: 10px; overflow-wrap: anywhere; min-width: 0; }
 .importlijst li.fout { color: var(--slecht); }
 .melding { margin: 0; font-size: 13px; color: var(--ok); }
 
