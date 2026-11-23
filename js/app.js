@@ -2,6 +2,7 @@ import * as store from './store.js';
 import { parseFluvius } from './fluvius.js';
 import { kostenPerMaand } from './kosten.js';
 import { BELPEX_RLP } from './indexen.js';
+import { NET, MIN_PIEK } from './tarieven.js';
 import * as A from './berekeningen.js';
 import { esc, ring, gegroepeerd, gestapeld, lijnen, heatmap, dagprofiel } from './charts.js';
 
@@ -50,6 +51,11 @@ function splitBalk(split, fmt = eur) {
 
 function chips(opties, gekozen, actie, label) {
   return `<div class="chips" role="group" aria-label="${esc(label)}">${opties.map((o) => `<button type="button" class="chip${gekozen(o.waarde) ? ' aan' : ''}" data-actie="${actie}" data-waarde="${esc(o.waarde)}" aria-pressed="${gekozen(o.waarde)}">${esc(o.label)}</button>`).join('')}</div>`;
+}
+
+function conclusies(items) {
+  if (!items?.length) return '';
+  return `<ul class="conclusies">${items.map((c) => `<li${c.toon ? ` class="${c.toon}"` : ''}>${c.t}</li>`).join('')}</ul>`;
 }
 
 function detailKop(titel) {
@@ -107,6 +113,7 @@ function overzicht() {
   const l12 = laatste12(kosten);
   const k = l12.length ? kostenVan(l12) : null;
   const p = A.prognose(state.data, state.instellingen);
+  const kern = kernConclusie(s);
 
   return `
   <header class="kop"><div class="sub">${DAG[nu.getDay()]} ${nu.getDate()} ${MND[nu.getMonth()]}</div><h1>Thuis</h1></header>
@@ -118,6 +125,7 @@ function overzicht() {
     ${ymNu ? `<a class="tegel" href="#/stroom"><div class="tl"><i style="background:${KLEUR.stroom}"></i>Piek</div>
       <div class="tw">${f2(pieken[ymNu])}<small>kW</small></div><div class="td">${maandLang(ymNu)}</div></a>` : ''}
   </div>
+  ${kern ? `<section class="kaart kern">${conclusies([kern])}</section>` : ''}
 
   ${s || g ? `<section class="kaart">
     <div class="kaart-kop"><h2>Dit jaar tegen vorig jaar</h2><span>t.e.m. ${datumKort((g || s).laatste)}</span></div>
@@ -130,6 +138,20 @@ function overzicht() {
   </a>` : ''}
 
   ${p ? prognoseKaart(p, true) : ''}`;
+}
+
+// Eén zin met het belangrijkste van het moment. In het stookseizoen: gas gecorrigeerd voor het weer.
+function kernConclusie(s) {
+  if (!state.weer && !state.weerFout && !state.weerBezig) laadWeer();
+  if (state.weer) {
+    const r = A.gasPerGraaddag(state.data.dagen, state.weer);
+    if (r.recent && r.vorigJaar && r.recent.gd >= 60) {
+      const pct = (r.recent.perGd / r.vorigJaar.perGd - 1) * 100;
+      return { t: `Gecorrigeerd voor het weer verbruik je de laatste 30 dagen <b>${f1(Math.abs(pct))}% ${pct > 0 ? 'meer' : 'minder'} gas</b> dan dezelfde periode vorig jaar.`, toon: pct > 2 ? 'slecht' : pct < -2 ? 'ok' : undefined };
+    }
+  }
+  if (s?.pct != null) return { t: `Dit jaar verbruik je <b>${f1(Math.abs(s.pct))}% ${s.pct > 0 ? 'meer' : 'minder'} stroom</b> dan vorig jaar over dezelfde periode.`, toon: s.pct > 2 ? 'slecht' : s.pct < -2 ? 'ok' : undefined };
+  return null;
 }
 
 function ringBlok(naam, y, eenheid, kleur) {
@@ -197,6 +219,7 @@ function uurKaart(soort, uren, e, eenheidUur) {
     ${heatmap(dagenLijst.map((d) => ({ label: datumKort(d), waarden: uren[d] })), e.rgb, (v) => `${f2(v)} ${eenheidUur}`, `${e.naam} per uur, één rij per dag`)}
     <h3 class="tussenkop">Gemiddelde dag</h3>
     ${dagprofiel(gem, e.kleur, (v) => `${f2(v)} ${eenheidUur}`, `Gemiddeld ${e.naam.toLowerCase()}verbruik per uur van de dag`)}
+    ${conclusies(A.uurConclusies(soort, dagenLijst, uren, state.data.dagen, state.weer, (v) => `${f2(v)} ${eenheidUur}`))}
   </section>`;
 }
 
@@ -217,10 +240,18 @@ function energieScherm(soort) {
     const dit = Object.entries(dagen).filter(([d]) => d.startsWith(String(y.jaar)));
     const dag = dit.reduce((a, [, v]) => a + (v.sd ?? 0), 0), nacht = dit.reduce((a, [, v]) => a + (v.sn ?? 0), 0);
     const sluip = A.sluipverbruik(suren, kostenPerMaand(dagen, pieken));
+    const pc = A.piekConclusie(pieken, (NET.stroom[new Date().getFullYear()] ?? Object.values(NET.stroom).at(-1)).capaciteit, MIN_PIEK);
+    const top = A.uitschieters(dagen, A.stroomKwh);
     extra = `
     ${piekReeksen.length ? `<section class="kaart"><div class="kaart-kop"><h2>Maandpiek</h2>${legende(piekReeksen)}</div>
       <p class="uitleg">Hoogste kwartiervermogen per maand. Telt mee in het capaciteitstarief.</p>
-      ${lijnen(piekReeksen, MND, (v) => `${f2(v)} kW`, 'Maandpiek per jaar')}</section>` : ''}
+      ${lijnen(piekReeksen, MND, (v) => `${f2(v)} kW`, 'Maandpiek per jaar')}
+      ${pc ? conclusies([
+        { t: `Je hoogste piek van de laatste 12 maanden was <b>${f2(pc.topKw)} kW</b> in ${maandVol(pc.top)}.` },
+        { t: `Je capaciteitstarief rekent met het gemiddelde van die 12 pieken: <b>${f2(pc.rollend)} kW</b>, ongeveer <b>${eur0(pc.kost)}</b> per jaar. Elke kW lager scheelt <b>${eur0(pc.perKw)}</b> per jaar: niet tegelijk koken, wassen en drogen helpt.` },
+      ]) : ''}</section>` : ''}
+    ${top ? `<section class="kaart"><div class="kaart-kop"><h2>Drukste dagen</h2><span>laatste 12 maanden</span></div>
+      ${conclusies(top.top.map(([d, v]) => ({ t: `<b>${DAG[new Date(d + 'T12:00:00Z').getUTCDay()]} ${datumJaar(d)}</b>: ${f1(v)} kWh, ${f1(v / top.mediaan)}× een gewone dag (${f1(top.mediaan)} kWh)` })))}</section>` : ''}
     <section class="kaart"><div class="kaart-kop"><h2>Sluipverbruik</h2>${sluip ? `<span>laatste ${sluip.nachten} nachten</span>` : ''}</div>
       ${sluip ? `<div class="groot">${f0(sluip.watt)}<small>W</small></div>
         <p class="uitleg">Zoveel verbruikt je huis zelfs 's nachts, als alles uit lijkt: koelkast, diepvries, router, toestellen op stand-by.
@@ -283,7 +314,8 @@ async function laadWeer() {
     state.weerFout = 'Weergegevens konden niet geladen worden. Probeer later opnieuw.';
   }
   state.weerBezig = false;
-  if (location.hash.includes('gas')) render(false);
+  const r = location.hash.replace(/^#\/?/, '');
+  if (r === 'gas' || r === '') render(false);
 }
 
 // ---------- Kosten ----------
@@ -316,6 +348,10 @@ function kostenScherm() {
     <div class="legende"><span><i style="background:${KLEUR.stroom}"></i>Stroom ${eur(k.stroom)}</span><span><i style="background:${KLEUR.gas}"></i>Gas ${eur(k.gas)}</span></div></div>` : ''}
   <section class="kaart"><div class="kaart-kop"><h2>Per maand</h2></div>
     ${gestapeld(kol, eur, 'Kosten per maand, stroom en gas gestapeld')}
+    ${(() => { const c = A.kostenConclusies(selectie); return c ? conclusies([
+      { t: `Duurste maand: <b>${maandVol(c.duurst.maand)}</b> (${eur0(c.duurst.eur)}), goedkoopste: <b>${maandVol(c.goedkoopst.maand)}</b> (${eur0(c.goedkoopst.eur)}).` },
+      ...(c.winterAandeel != null ? [{ t: `December tot februari zijn samen goed voor <b>${Math.round(c.winterAandeel * 100)}%</b> van je gaskosten in deze periode.` }] : []),
+    ]) : ''; })()}
     ${zonderIndex.length ? `<p class="uitleg">Stroom van ${zonderIndex.map((m) => maandLang(m.maand)).join(', ')} volgt zodra de beursindex van die maand gepubliceerd is.</p>` : ''}</section>
   ${k ? `<section class="kaart"><div class="kaart-kop"><h2>Waar betaal je voor?</h2></div>${splitBalk(k.split)}</section>` : ''}
   <section class="kaart"><div class="kaart-kop"><h2>Jaar na jaar</h2></div>

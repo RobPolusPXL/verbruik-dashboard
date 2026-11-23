@@ -224,3 +224,118 @@ export function zelfdePeriode(dagen, waarde) {
   }
   return uit.sort((a, b) => a.jaar - b.jaar);
 }
+
+// ---------- Conclusies ----------
+// Geven zinnen terug als { t: 'html', toon?: 'ok' | 'slecht' }. Getallen worden door de aanroeper opgemaakt via fmt.
+const gem = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0);
+const uurTxt = (u) => `${u}u`;
+
+// Drukste blok van 2 opeenvolgende uren in een gemiddeld dagprofiel.
+function drukstBlok(profiel) {
+  let best = 0;
+  for (let u = 1; u < 23; u++) if (profiel[u] + profiel[u + 1] > profiel[best] + profiel[best + 1]) best = u;
+  return { van: best, tot: best + 2, waarde: (profiel[best] + profiel[best + 1]) / 2 };
+}
+
+export function uurConclusies(soort, dagenLijst, uren, dagen, temp, fmt) {
+  if (dagenLijst.length < 5) return [];
+  const prof = Array.from({ length: 24 }, (_, u) => gem(dagenLijst.map((d) => uren[d][u] ?? 0)));
+  const nacht = gem(prof.slice(0, 6)), dag = gem(prof.slice(7, 23));
+  const blok = drukstBlok(prof);
+  const uit = [];
+  if (soort === 'gas') {
+    const totaal = gem(dagenLijst.map((d) => uren[d].reduce((a, b) => a + b, 0)));
+    if (totaal < 0.5) return [{ t: 'De verwarming stond in deze periode zo goed als uit.' }];
+    const uitNachten = dagenLijst.filter((d) => uren[d].slice(1, 6).reduce((a, b) => a + b, 0) < 0.05).length;
+    if (dag < 0.05) {
+      // Weinig gestookt: dag/nacht-vergelijking zegt dan weinig.
+    } else if (nacht > dag * 1.05) {
+      uit.push({ t: `Je verwarming verbruikt 's nachts zelfs méér dan overdag: <b>${fmt(nacht)}</b> per uur tegen <b>${fmt(dag)}</b>. Een nachtverlaging is niet te zien.`, toon: 'slecht' });
+    } else if (nacht >= dag * 0.85) {
+      uit.push({ t: `Je verwarming verbruikt 's nachts ongeveer evenveel als overdag: <b>${fmt(nacht)}</b> per uur tegen <b>${fmt(dag)}</b>. Een nachtverlaging is niet te zien.`, toon: 'slecht' });
+    } else {
+      uit.push({ t: `'s Nachts verbruik je <b>${Math.round((1 - nacht / dag) * 100)}% minder</b> gas dan overdag (${fmt(nacht)} tegen ${fmt(dag)} per uur).`, toon: 'ok' });
+    }
+    if (uitNachten) uit.push({ t: `Op <b>${uitNachten} van ${dagenLijst.length}</b> nachten brandde de ketel tussen 1u en 6u nauwelijks.`, toon: 'ok' });
+    uit.push({ t: `Het meeste gas gaat op tussen <b>${uurTxt(blok.van)} en ${uurTxt(blok.tot)}</b> (${fmt(blok.waarde)} per uur).` });
+  } else {
+    const laag = Math.min(...prof);
+    uit.push({ t: `Je verbruikt het meest tussen <b>${uurTxt(blok.van)} en ${uurTxt(blok.tot)}</b>: ${fmt(blok.waarde)} per uur, <b>${f1nl(blok.waarde / laag)}×</b> zoveel als op het rustigste uur.` });
+    const we = dagenLijst.filter((d) => [0, 6].includes(new Date(d + 'T12:00:00Z').getUTCDay()));
+    const wk = dagenLijst.filter((d) => !we.includes(d));
+    if (we.length >= 2 && wk.length >= 3) {
+      const t = (d) => uren[d].reduce((a, b) => a + b, 0);
+      const pct = (gem(we.map(t)) / gem(wk.map(t)) - 1) * 100;
+      if (Math.abs(pct) >= 5) uit.push({ t: `In het weekend verbruik je <b>${Math.round(Math.abs(pct))}% ${pct > 0 ? 'meer' : 'minder'}</b> per dag dan in de week (${fmt(gem(we.map(t)))} tegen ${fmt(gem(wk.map(t)))}).` });
+      else uit.push({ t: 'Weekend en week verschillen nauwelijks in verbruik per dag.' });
+    }
+  }
+  const vj = tegenVorigJaar(soort, dagenLijst, dagen, temp);
+  if (vj) uit.push(vj);
+  return uit;
+}
+
+const f1nl = (v) => v.toLocaleString('nl-BE', { maximumFractionDigits: 1 });
+const vorigJaarDag = (d) => `${+d.slice(0, 4) - 1}${d.slice(4)}`;
+
+// Dezelfde dagen een jaar eerder. Gas altijd per graaddag, anders zegt het vooral iets over het weer.
+export function tegenVorigJaar(soort, dagenLijst, dagen, temp) {
+  const paren = dagenLijst.map((d) => [d, vorigJaarDag(d)]);
+  if (soort === 'stroom') {
+    const ok = paren.filter(([a, b]) => stroomKwh(dagen[a] || {}) != null && stroomKwh(dagen[b] || {}) != null);
+    if (ok.length < dagenLijst.length * 0.8) return null;
+    const nu = ok.reduce((s, [a]) => s + stroomKwh(dagen[a]), 0), toen = ok.reduce((s, [, b]) => s + stroomKwh(dagen[b]), 0);
+    const pct = (nu / toen - 1) * 100;
+    return { t: `Tegen dezelfde dagen vorig jaar: <b>${pct > 0 ? '+' : '−'}${f1nl(Math.abs(pct))}%</b> stroom.`, toon: pct > 2 ? 'slecht' : pct < -2 ? 'ok' : undefined };
+  }
+  if (!temp) return null;
+  const ok = paren.filter(([a, b]) => dagen[a]?.gm != null && dagen[b]?.gm != null && temp[a] != null && temp[b] != null);
+  if (ok.length < dagenLijst.length * 0.8) return null;
+  const som = (i, f) => ok.reduce((s, p) => s + f(p[i]), 0);
+  const gdNu = som(0, (d) => graaddag(temp[d])), gdToen = som(1, (d) => graaddag(temp[d]));
+  if (gdNu < 20 || gdToen < 20) return null;
+  const ruw = (som(0, (d) => dagen[d].gm) / som(1, (d) => dagen[d].gm) - 1) * 100;
+  const pct = ((som(0, (d) => dagen[d].gm) / gdNu) / (som(1, (d) => dagen[d].gm) / gdToen) - 1) * 100;
+  const koud = (gdNu / gdToen - 1) * 100;
+  return {
+    t: `Tegen dezelfde dagen vorig jaar: <b>${pct > 0 ? '+' : '−'}${f1nl(Math.abs(pct))}%</b> gas, gecorrigeerd voor het weer. ${Math.abs(koud) < 1 ? 'Het was ongeveer even koud.' : `Zonder correctie ${ruw > 0 ? '+' : '−'}${f1nl(Math.abs(ruw))}%, want het was ${f1nl(Math.abs(koud))}% ${koud > 0 ? 'kouder' : 'warmer'}.`}`,
+    toon: pct > 2 ? 'slecht' : pct < -2 ? 'ok' : undefined,
+  };
+}
+
+// Hoogste maandpiek en wat 1 kW lager rollend gemiddelde per jaar scheelt.
+export function piekConclusie(pieken, capaciteitPerKw, minPiek) {
+  const ms = Object.keys(pieken).sort().slice(-12);
+  if (ms.length < 3) return null;
+  const top = ms.reduce((a, m) => (pieken[m] > pieken[a] ? m : a), ms[0]);
+  const rollend = Math.max(minPiek, gem(ms.map((m) => pieken[m])));
+  return { top, topKw: pieken[top], rollend, perKw: capaciteitPerKw, kost: rollend * capaciteitPerKw };
+}
+
+// Drukste dagen van de laatste 365 dagen, tegenover een gewone dag (mediaan).
+export function uitschieters(dagen, waarde, n = 3) {
+  const ds = Object.keys(dagen).filter((d) => waarde(dagen[d]) != null).sort();
+  if (ds.length < 60) return null;
+  const laatste = ds.at(-1);
+  const grens = vorigJaarDag(laatste);
+  const jaar = ds.filter((d) => d > grens).map((d) => [d, waarde(dagen[d])]);
+  const sorted = jaar.map((x) => x[1]).sort((a, b) => a - b);
+  const mediaan = sorted[Math.floor(sorted.length / 2)];
+  return { mediaan, top: [...jaar].sort((a, b) => b[1] - a[1]).slice(0, n) };
+}
+
+// Duurste maand van een reeks en aandeel van de wintermaanden (dec–feb) in de gaskost.
+export function kostenConclusies(maanden) {
+  const vol = maanden.filter((m) => m.stroom && m.gas);
+  if (vol.length < 6) return null;
+  const tot = (m) => m.stroom.totaal + m.gas.totaal;
+  const duurst = vol.reduce((a, m) => (tot(m) > tot(a) ? m : a), vol[0]);
+  const goedkoopst = vol.reduce((a, m) => (tot(m) < tot(a) ? m : a), vol[0]);
+  const gasTot = vol.reduce((s, m) => s + m.gas.totaal, 0);
+  const winter = vol.filter((m) => ['12', '01', '02'].includes(m.maand.slice(5)));
+  const winterGas = winter.reduce((s, m) => s + m.gas.totaal, 0);
+  return {
+    duurst: { maand: duurst.maand, eur: tot(duurst) }, goedkoopst: { maand: goedkoopst.maand, eur: tot(goedkoopst) },
+    winterAandeel: winter.length === 3 && gasTot ? winterGas / gasTot : null,
+  };
+}

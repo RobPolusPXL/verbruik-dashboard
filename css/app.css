@@ -134,3 +134,13 @@ body > main > .chips { margin: 0 2px 4px; }
 .veld input, .veld select { font: inherit; font-size: 16px; color: inherit; background: var(--bg); border: 1px solid var(--rand);
   border-radius: 10px; padding: 10px 12px; width: 100%; box-sizing: border-box; }
 .uitleg a { color: inherit; }
+
+/* Conclusies */
+.conclusies { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.conclusies li { position: relative; padding: 9px 12px 9px 30px; border-radius: 12px; background: rgba(255,255,255,.03);
+  border: 1px solid var(--rand); font-size: 13px; line-height: 1.5; color: var(--zacht); }
+.conclusies li::before { content: ''; position: absolute; left: 12px; top: 15px; width: 8px; height: 8px; border-radius: 50%; background: #8B95A3; }
+.conclusies li.ok::before { background: var(--ok); }
+.conclusies li.slecht::before { background: var(--slecht); }
+.conclusies b { color: #E8EAED; font-weight: 600; }
+.kaart.kern { padding: 0; background: none; border: 0; }
