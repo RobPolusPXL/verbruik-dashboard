@@ -491,4 +491,12 @@ store.init((u) => {
 
 render();
 
-if ('serviceWorker' in navigator && !location.search.includes('demo')) navigator.serviceWorker.register('sw.js');
+if ('serviceWorker' in navigator && !location.search.includes('demo')) {
+  // Nieuwe versie geïnstalleerd: één keer herladen zodat je meteen de nieuwste app ziet.
+  const hadController = !!navigator.serviceWorker.controller;
+  let herladen = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (hadController && !herladen) { herladen = true; location.reload(); }
+  });
+  navigator.serviceWorker.register('sw.js').then((reg) => reg.update()).catch(() => {});
+}
