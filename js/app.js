@@ -280,9 +280,13 @@ document.addEventListener('change', async (e) => {
 
 // Tooltip bij aanraken of muis
 const tip = document.getElementById('tip');
+let actief = null;
 function toonTip(e) {
   const el = e.target.closest?.('[data-tip]');
+  if (actief && actief !== el) actief.classList.remove('actief');
+  actief = el;
   if (!el) { tip.hidden = true; return; }
+  el.classList.add('actief');
   tip.textContent = el.dataset.tip;
   tip.hidden = false;
   const x = Math.min(e.clientX + 12, innerWidth - tip.offsetWidth - 8);
@@ -291,7 +295,7 @@ function toonTip(e) {
 }
 document.addEventListener('pointermove', toonTip);
 document.addEventListener('pointerdown', toonTip);
-document.addEventListener('scroll', () => { tip.hidden = true; }, { passive: true });
+document.addEventListener('scroll', () => { tip.hidden = true; actief?.classList.remove('actief'); }, { passive: true });
 
 window.addEventListener('hashchange', render);
 

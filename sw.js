@@ -1,6 +1,6 @@
 // Eenvoudige service worker: app-bestanden cachen zodat de app snel opent en offline start.
 // Data komt uit Firestore (die heeft een eigen offline cache) en wordt hier niet gecachet.
-const CACHE = 'verbruik-v2';
+const CACHE = 'verbruik-v3';
 const BESTANDEN = ['./', 'index.html', 'css/app.css', 'js/app.js', 'js/store.js', 'js/fluvius.js', 'js/kosten.js',
   'js/tarieven.js', 'js/indexen.js', 'js/charts.js', 'firebase-config.js', 'manifest.webmanifest', 'icons/icon.svg'];
 

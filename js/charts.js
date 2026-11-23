@@ -33,17 +33,32 @@ export function gegroepeerd(reeksen, maandLabels, fmt, label) {
     });
     s += `<text x="${(m * groep + groep / 2).toFixed(1)}" y="${H - 4}" class="as">${esc(maandLabels[m][0])}</text>`;
   }
+  s += kolommen(12, groep, H, (m) => {
+    const regels = reeksen.filter((r) => r.waarden[m] != null && r.waarden[m] !== 0).map((r) => `${r.naam}: ${fmt(r.waarden[m])}`);
+    return regels.length ? `${maandLabels[m]}\n${regels.join('\n')}` : null;
+  });
   return `<svg class="grafiek" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(label)}">${s}</svg>`;
 }
 
-// Gestapelde staven: [{ label, kort, delen: [{ waarde, kleur, naam }] }]
-export function gestapeld(kolommen, fmt, label) {
-  const W = 350, H = 170, onder = 18, boven = 6;
-  const max = Math.max(1, ...kolommen.map((k) => k.delen.reduce((a, d) => a + (d.waarde || 0), 0)));
-  const breed = W / kolommen.length, bw = breed * 0.72;
-  const stap = Math.ceil(kolommen.length / 10);
+// Onzichtbare vlakken over de volle hoogte van elke kolom, zodat je op een gsm makkelijk een maand aantikt.
+function kolommen(n, breed, H, tekst, x0 = 0) {
   let s = '';
-  kolommen.forEach((k, i) => {
+  for (let i = 0; i < n; i++) {
+    const t = tekst(i);
+    if (t) s += `<rect class="kolom" x="${(x0 + i * breed).toFixed(1)}" y="0" width="${breed.toFixed(1)}" height="${H}" data-tip="${esc(t)}"></rect>`;
+  }
+  return s;
+}
+
+// Gestapelde staven: [{ label, kort, delen: [{ waarde, kleur, naam }] }]
+export function gestapeld(kolommen_, fmt, label) {
+  const kolommenLijst = kolommen_;
+  const W = 350, H = 170, onder = 18, boven = 6;
+  const max = Math.max(1, ...kolommenLijst.map((k) => k.delen.reduce((a, d) => a + (d.waarde || 0), 0)));
+  const breed = W / kolommenLijst.length, bw = breed * 0.72;
+  const stap = Math.ceil(kolommenLijst.length / 10);
+  let s = '';
+  kolommenLijst.forEach((k, i) => {
     let y = H - onder;
     const x = i * breed + (breed - bw) / 2;
     const tot = k.delen.reduce((a, d) => a + (d.waarde || 0), 0);
@@ -56,6 +71,12 @@ export function gestapeld(kolommen, fmt, label) {
         data-tip="${esc(`${k.label}: ${d.naam} ${fmt(d.waarde)} · totaal ${fmt(tot)}`)}"></rect>`;
     });
     if (i % stap === 0) s += `<text x="${(x + bw / 2).toFixed(1)}" y="${H - 4}" class="as">${esc(k.kort)}</text>`;
+  });
+  s += kolommen(kolommen_.length, breed, H, (i) => {
+    const k = kolommen_[i];
+    const tot = k.delen.reduce((a, d) => a + (d.waarde || 0), 0);
+    if (!tot) return null;
+    return `${k.label}\n${k.delen.filter((d) => d.waarde).map((d) => `${d.naam}: ${fmt(d.waarde)}`).join('\n')}\ntotaal: ${fmt(tot)}`;
   });
   return `<svg class="grafiek" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(label)}">${s}</svg>`;
 }
@@ -76,6 +97,11 @@ export function lijnen(reeksen, maandLabels, fmt, label) {
     });
   }
   maandLabels.forEach((l, m) => { s += `<text x="${x(m).toFixed(1)}" y="${H - 4}" class="as">${esc(l[0])}</text>`; });
+  const stapX = (W - 20) / 11;
+  s += kolommen(12, stapX, H, (m) => {
+    const regels = reeksen.filter((r) => r.waarden[m] != null).map((r) => `${r.naam}: ${fmt(r.waarden[m])}`);
+    return regels.length ? `${maandLabels[m]}\n${regels.join('\n')}` : null;
+  }, 10 - stapX / 2);
   return `<svg class="grafiek" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(label)}">${s}</svg>`;
 }
 
