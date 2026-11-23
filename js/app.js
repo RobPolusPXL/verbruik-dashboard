@@ -2,7 +2,7 @@ import * as store from './store.js';
 import { parseFluvius } from './fluvius.js';
 import { kostenPerMaand } from './kosten.js';
 import { BELPEX_RLP } from './indexen.js';
-import * as A from './analyse.js';
+import * as A from './berekeningen.js';
 import { esc, ring, gegroepeerd, gestapeld, lijnen, heatmap, dagprofiel } from './charts.js';
 
 const KLEUR = { stroom: '#F5C542', gas: '#FF8A4C', ok: '#5BD68A', slecht: '#F2A65A' };
