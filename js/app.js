@@ -153,21 +153,19 @@ function prognoseKaart(p, link) {
 }
 
 // ---------- Stroom en gas ----------
-function statTabel(y, e) {
-  const { nu, vorig } = y.detail;
-  const rij = (label, a, b) => `<tr><th scope="row">${label}</th><td>${a}</td><td>${b}</td></tr>`;
-  const maand = (m) => (m ? `${e.fmt(m[1])} <small>${maandLang(m[0])}</small>` : '—');
-  const dag = (d) => (d ? `${e.fmtD(d[1])} <small>${datumKort(d[0])}</small>` : '—');
-  return `<table class="stats">
-    <thead><tr><th></th><th scope="col">${y.jaar}</th><th scope="col">${y.jaar - 1}</th></tr></thead>
-    <tbody>
-      ${rij(`Totaal (${e.eenheid})`, e.fmt(nu.totaal), vorig ? e.fmt(vorig.totaal) : '—')}
-      ${rij('Gemiddeld per dag', e.fmtD(nu.perDag), vorig ? e.fmtD(vorig.perDag) : '—')}
-      ${rij('Hoogste maand', maand(nu.hoogsteMaand), maand(vorig?.hoogsteMaand))}
-      ${rij('Laagste maand', maand(nu.laagsteMaand), maand(vorig?.laagsteMaand))}
-      ${rij('Hoogste dag', dag(nu.hoogsteDag), dag(vorig?.hoogsteDag))}
-      ${rij('Laagste dag', dag(nu.laagsteDag), dag(vorig?.laagsteDag))}
-    </tbody></table>`;
+// Dit jaar tegen elk vorig jaar, telkens over dezelfde periode, als ringen.
+function jarenRingen(dagen, e, y) {
+  const jaren = A.zelfdePeriode(dagen, e.waarde);
+  const nu = jaren.find((j) => j.jaar === y.jaar);
+  const vorige = jaren.filter((j) => j.jaar < y.jaar).reverse();
+  if (!nu || !vorige.length) return '';
+  return `<section class="kaart"><div class="kaart-kop"><h2>${y.jaar} tegen vorige jaren</h2><span>1 jan – ${datumKort(y.laatste)}</span></div>
+    <div class="ringen">${vorige.map((v) => {
+      const pct = (nu.totaal / v.totaal - 1) * 100;
+      return `<div class="ring-blok">
+        ${ring(nu.totaal / v.totaal, e.kleur, `${y.jaar}: ${e.fmt(nu.totaal)} ${e.eenheid}, ${v.jaar}: ${e.fmt(v.totaal)} ${e.eenheid}`, `${pct > 0 ? '+' : '−'}${f1(Math.abs(pct))}%`, `t.o.v. ${v.jaar}`)}
+        <div class="ring-sub">${e.fmt(v.totaal)} ${e.eenheid}<br><span>in ${v.jaar}</span></div></div>`;
+    }).join('')}</div></section>`;
 }
 
 function uurKaart(soort, uren, e, eenheidUur) {
@@ -241,7 +239,7 @@ function energieScherm(soort) {
   return `${detailKop(e.naam)}
   <div class="kop-getal"><div class="groot" style="color:${e.kleur}">${e.fmt(y.nu)}<small>${e.eenheid}</small></div>
     <div>${delta(y.pct)} <span class="sub">t.o.v. ${y.jaar - 1}, t.e.m. ${datumKort(y.laatste)}</span></div></div>
-  <section class="kaart"><div class="kaart-kop"><h2>Dit jaar tegen vorig jaar</h2><span>1 jan – ${datumKort(y.laatste)}</span></div>${statTabel(y, e)}</section>
+  ${jarenRingen(dagen, e, y)}
   <section class="kaart"><div class="kaart-kop"><h2>Per maand</h2></div>${jaarChips}${legende(reeksen)}
     ${gegroepeerd(reeksen, MAAND_VOL, (v) => `${e.fmt(v)} ${e.eenheid}`, `${e.naam}verbruik per maand per jaar`)}</section>
   <section class="kaart"><div class="kaart-kop"><h2>Per jaar</h2></div>

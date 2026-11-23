@@ -209,3 +209,18 @@ export function gasPerGraaddag(dagen, temp) {
   };
   return { perMaand, recent: laatste ? venster(laatste) : null, vorigJaar: laatste ? venster(jaarErbij(laatste, -1)) : null, laatste };
 }
+
+// Elk jaar over dezelfde periode (1 jan t.e.m. de laatste dag met data). Alleen jaren die die periode volledig dekken.
+export function zelfdePeriode(dagen, waarde) {
+  const met = Object.keys(dagen).filter((d) => waarde(dagen[d]) != null).sort();
+  if (!met.length) return [];
+  const laatste = met.at(-1), md = laatste.slice(5);
+  const nodig = met.filter((d) => d.startsWith(laatste.slice(0, 4))).length;
+  const uit = [];
+  for (const j of new Set(met.map((d) => +d.slice(0, 4)))) {
+    const ds = met.filter((d) => d >= `${j}-01-01` && d <= `${j}-${md}`);
+    if (ds.length < nodig - 3) continue;
+    uit.push({ jaar: j, totaal: ds.reduce((a, d) => a + waarde(dagen[d]), 0) });
+  }
+  return uit.sort((a, b) => a.jaar - b.jaar);
+}
