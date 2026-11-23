@@ -7,8 +7,14 @@ const SDK = 'https://www.gstatic.com/firebasejs/10.12.2';
 const DEMO = typeof location !== 'undefined' && new URLSearchParams(location.search).has('demo');
 
 let fb = null; // { auth, db, a: authModule, f: firestoreModule }
+let klaar = null; // belofte die afloopt zodra Firebase geladen is
 
-export async function init(onUser) {
+export function init(onUser) {
+  klaar = start(onUser);
+  return klaar;
+}
+
+async function start(onUser) {
   if (DEMO) { onUser({ uid: 'demo', displayName: 'Demo', demo: true }); return; }
   const { firebaseConfig } = await import('../firebase-config.js');
   if (!firebaseConfig || !firebaseConfig.apiKey) throw new Error('config');
@@ -24,6 +30,8 @@ export async function init(onUser) {
 }
 
 export async function login() {
+  await klaar;
+  if (!fb) throw new Error('Firebase is niet geladen. Herlaad de pagina.');
   const { auth, a } = fb;
   const provider = new a.GoogleAuthProvider();
   try { await a.signInWithPopup(auth, provider); }

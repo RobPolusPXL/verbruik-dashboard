@@ -22,7 +22,7 @@ const maandVol = (ym) => `${MAAND_VOL[+ym.slice(5, 7) - 1]} ${ym.slice(0, 4)}`;
 
 const $view = document.getElementById('view');
 const state = {
-  user: null, data: null, instellingen: {}, imports: [], bezig: false, fout: null, melding: null,
+  user: null, gestart: false, data: null, instellingen: {}, imports: [], bezig: false, fout: null, melding: null,
   ui: { jaren: {}, uurMaand: {}, kostenJaar: 'laatste' },
   weer: null, weerFout: null, weerBezig: false,
 };
@@ -386,7 +386,7 @@ const ROUTES = { '': overzicht, stroom: () => energieScherm('stroom'), gas: () =
 function render(boven = true) {
   const route = location.hash.replace(/^#\/?/, '');
   document.querySelectorAll('nav a').forEach((a) => a.classList.toggle('actief', a.getAttribute('href') === `#/${route}`));
-  if (!state.user) { $view.innerHTML = loginScherm(); return; }
+  if (!state.user) { $view.innerHTML = state.gestart || state.fout ? loginScherm() : '<div class="laden">Laden…</div>'; return; }
   if (!state.data) { $view.innerHTML = '<div class="laden">Laden…</div>'; return; }
   const y = scrollY;
   $view.innerHTML = (ROUTES[route] || overzicht)();
@@ -486,7 +486,7 @@ document.addEventListener('scroll', () => { tip.hidden = true; actief?.classList
 window.addEventListener('hashchange', () => render());
 
 store.init((u) => {
-  state.user = u;
+  state.user = u; state.gestart = true;
   if (u) laad(); else { state.data = null; render(); }
 }).catch((err) => { state.fout = err.message === 'config' ? 'config' : err.message; render(); });
 
