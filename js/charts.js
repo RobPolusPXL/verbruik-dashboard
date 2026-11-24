@@ -85,9 +85,10 @@ export function gestapeld(kolommen_, fmt, label) {
 export function lijnen(reeksen, maandLabels, fmt, label) {
   const W = 350, H = 150, onder = 18, boven = 8;
   const alle = reeksen.flatMap((r) => r.waarden.filter((v) => v != null));
+  const min = Math.min(0, ...alle);
   const max = Math.max(1, ...alle) * 1.08;
   const x = (m) => 10 + m * ((W - 20) / 11);
-  const y = (v) => H - onder - (v / max) * (H - onder - boven);
+  const y = (v) => H - onder - ((v - min) / (max - min)) * (H - onder - boven);
   let s = '';
   for (const r of reeksen) {
     const pts = r.waarden.map((v, m) => (v == null ? null : [x(m), y(v)])).filter(Boolean);

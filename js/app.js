@@ -3,6 +3,7 @@ import { parseFluvius } from './fluvius.js';
 import { kostenPerMaand, ontbreekt } from './kosten.js';
 import { MIN_PIEK, contracten, netVoor, gscVoor, zetEigen } from './tarieven.js';
 import * as A from './berekeningen.js';
+import * as P from './plaats.js';
 import { esc, ring, gegroepeerd, gestapeld, lijnen, heatmap, dagprofiel } from './charts.js';
 
 const KLEUR = { stroom: '#F5C542', gas: '#FF8A4C', ok: '#5BD68A', slecht: '#F2A65A' };
@@ -212,6 +213,71 @@ function jarenRingen(dagen, e, y) {
     }).join('')}</div></section>`;
 }
 
+// ---------- Buitentemperatuur ----------
+const plaatsVan = () => state.instellingen.plaats || null;
+function tempNodig() {
+  const pl = plaatsVan();
+  if (!pl || state.temp || state.tempBezig || state.tempFout) return;
+  state.tempBezig = true;
+  const van = Object.keys(state.data.dagen).sort()[0];
+  P.temperaturen(pl, van).then((t) => { state.temp = t; })
+    .catch((err) => { state.tempFout = err.message; })
+    .finally(() => { state.tempBezig = false; if (location.hash.replace(/^#\/?/, '') === 'gas') render(false); });
+}
+
+function tempKaart(gekozen) {
+  const pl = plaatsVan();
+  const kop = '<div class="kaart-kop"><h2>Buitentemperatuur</h2>' + (pl ? `<span>${esc(pl.naam)}</span>` : '') + '</div>';
+  if (!pl) return `<section class="kaart" data-id="temp">${kop}<p class="uitleg">Vul bij <a href="#/import"><b>Gegevens</b></a> je gemeente in om hier de gemiddelde buitentemperatuur per maand te zien.</p></section>`;
+  tempNodig();
+  if (state.tempFout) return `<section class="kaart" data-id="temp">${kop}<p class="uitleg">${esc(state.tempFout)}</p></section>`;
+  if (!state.temp) return `<section class="kaart" data-id="temp">${kop}<p class="uitleg">Temperaturen laden…</p></section>`;
+  const pm = P.perMaand(state.temp);
+  const reeksen = jaarReeksen(pm, gekozen, KLEUR.gas);
+  // Laatste maand met temperaturen tegen dezelfde maand vorig jaar.
+  const laatste = Object.keys(pm).sort().at(-1);
+  const vorig = laatste && `${+laatste.slice(0, 4) - 1}${laatste.slice(4)}`;
+  const zin = laatste && pm[vorig] != null
+    ? `${MAAND_VOL[+laatste.slice(5) - 1][0].toUpperCase()}${MAAND_VOL[+laatste.slice(5) - 1].slice(1)} ${laatste.slice(0, 4)}${laatste === new Date().toISOString().slice(0, 7) ? ' (tot nu toe)' : ''} was gemiddeld <b>${f1(pm[laatste])}°</b>, tegen <b>${f1(pm[vorig])}°</b> in ${vorig.slice(0, 4)}: ${Math.abs(pm[laatste] - pm[vorig]) < 0.5 ? 'ongeveer even warm' : `<b>${f1(Math.abs(pm[laatste] - pm[vorig]))}° ${pm[laatste] < pm[vorig] ? 'kouder' : 'warmer'}</b>`}.`
+    : null;
+  return `<section class="kaart" data-id="temp">${kop}${legende(reeksen)}
+    ${lijnen(reeksen, MND, (v) => `${f1(v)} °C`, 'Gemiddelde buitentemperatuur per maand')}
+    ${zin ? conclusies([{ t: zin }]) : ''}
+    <p class="uitleg">Gemiddelde dagtemperatuur, bron Open-Meteo.</p></section>`;
+}
+
+// Hoe koud de getoonde dagen waren tegen dezelfde dagen vorig jaar.
+function tempZin(dagenLijst) {
+  if (!plaatsVan()) return [];
+  tempNodig();
+  const t = state.temp;
+  if (!t) return [];
+  const vj = (d) => `${+d.slice(0, 4) - 1}${d.slice(4)}`;
+  const ok = dagenLijst.filter((d) => t[d] != null && t[vj(d)] != null);
+  if (ok.length < dagenLijst.length * 0.8) return [];
+  const nu = ok.reduce((a, d) => a + t[d], 0) / ok.length, toen = ok.reduce((a, d) => a + t[vj(d)], 0) / ok.length;
+  const v = nu - toen;
+  return [{ t: `Buiten was het gemiddeld <b>${f1(nu)}°</b>, tegen <b>${f1(toen)}°</b> op dezelfde dagen vorig jaar: ${Math.abs(v) < 0.5 ? 'ongeveer even warm' : `<b>${f1(Math.abs(v))}° ${v < 0 ? 'kouder' : 'warmer'}</b>`}.` }];
+}
+
+function plaatsKaart() {
+  const pl = plaatsVan();
+  const keuzes = state.plaatsKeuzes || [];
+  return `<form class="kaart" data-id="plaats" id="plaatsform">
+    <h2>Plaats van de woning</h2>
+    <p class="uitleg">Nodig voor de buitentemperatuur. Alleen de gemeente wordt bewaard, geen adres.</p>
+    ${pl ? `<p class="uitleg">Nu: <b>${esc(pl.naam)}</b>${pl.postcode ? ` (${esc(pl.postcode)})` : ''}${pl.provincie ? `, ${esc(pl.provincie)}` : ''}</p>` : ''}
+    <div class="velden2">
+      <label class="veld"><span>Gemeente of postcode</span><input name="zoek" autocomplete="address-level2"></label>
+      <div class="veld"><span>&nbsp;</span><button type="submit" class="knop">Zoeken</button></div>
+    </div>
+    <label class="knop">Uit een factuur halen (PDF)<input id="factuur" type="file" accept="application/pdf,.pdf" hidden></label>
+    ${keuzes.length ? `<ul class="importlijst">${keuzes.map((k, i) => `<li><b>${esc(k.naam)}</b>${k.postcode ? ` (${esc(k.postcode)})` : ''}${k.provincie ? `, ${esc(k.provincie)}` : ''}
+      <button type="button" class="link kies" data-actie="plaats-kies" data-waarde="${i}">Kiezen</button></li>`).join('')}</ul>` : ''}
+    ${state.plaatsMelding ? `<p class="melding">${esc(state.plaatsMelding)}</p>` : ''}
+  </form>`;
+}
+
 function uurKaart(soort, uren, e, eenheidUur) {
   const beschikbaar = [...new Set(Object.keys(uren).map((d) => d.slice(0, 7)))].sort();
   if (!beschikbaar.length) return null;
@@ -242,7 +308,7 @@ function uurKaart(soort, uren, e, eenheidUur) {
   </section>
   <section class="kaart" data-id="dagprofiel"><div class="kaart-kop"><h2>Gemiddelde dag</h2><span>${esc(titel.toLowerCase())}</span></div>
     ${dagprofiel(gem, e.kleur, (v) => `${f2(v)} ${eenheidUur}`, `Gemiddeld ${e.naam.toLowerCase()}verbruik per uur van de dag`)}
-    ${conclusies(A.uurConclusies(soort, dagenLijst, uren, state.data.dagen, (v) => `${f2(v)} ${eenheidUur}`))}
+    ${conclusies([...A.uurConclusies(soort, dagenLijst, uren, state.data.dagen, (v) => `${f2(v)} ${eenheidUur}`), ...(soort === 'gas' ? tempZin(dagenLijst) : [])])}
   </section>`;
 }
 
@@ -295,6 +361,7 @@ function energieScherm(soort) {
   ${jarenRingen(dagen, e, y)}
   <section class="kaart" data-id="maand"><div class="kaart-kop"><h2>Per maand</h2></div>${jaarChips}${legende(reeksen)}
     ${gegroepeerd(reeksen, MAAND_VOL, (v) => `${e.fmt(v)} ${e.eenheid}`, `${e.naam}verbruik per maand per jaar`)}</section>
+  ${soort === 'gas' ? tempKaart(gekozen) : ''}
   <section class="kaart" data-id="jaar"><div class="kaart-kop"><h2>Per jaar</h2></div>
     ${gestapeld(totalen.map((t) => ({ label: String(t.jaar), kort: `'${String(t.jaar).slice(2)}`, onvolledig: t.dagen < 365,
       delen: [{ naam: e.naam.toLowerCase(), waarde: t.som, kleur: e.kleur }] })), (v) => `${e.fmt(v)} ${e.eenheid}`, `${e.naam}verbruik per jaar`)}
@@ -402,6 +469,7 @@ function importScherm() {
     <button type="submit" class="knop">Bewaren</button>
     ${state.instMelding ? `<p class="melding">${esc(state.instMelding)}</p>` : ''}
   </form>
+  ${plaatsKaart()}
   ${contractKaart()}
   ${tariefKaart()}
   <section class="kaart" data-id="account">
@@ -503,9 +571,9 @@ function render(boven = true) {
 const INDELING = {
   '': [['contractstatus'], ['ringen', 'kosten12', 'prognose']],
   stroom: [['jaren'], ['maand', 'jaar'], ['uur', 'dagprofiel'], ['piek', ['sluip', 'dagnacht']], ['drukste']],
-  gas: [['jaren'], ['maand', 'jaar'], ['uur', 'dagprofiel']],
+  gas: [['jaren'], ['maand', 'temp', 'jaar'], ['uur', 'dagprofiel']],
   kosten: [['kmaand', 'kjaar'], ['split', 'prognose'], ['vastvar']],
-  import: [['import', ['instellingen', 'account']], ['contracten', 'tarieven']],
+  import: [['import', ['instellingen', 'plaats', 'account']], ['contracten', 'tarieven']],
 };
 const COMPUTER = matchMedia('(min-width: 1100px)');
 function indelen(route) {
@@ -550,7 +618,7 @@ function loginScherm() {
 async function laad() {
   state.data = null; render();
   const [data, inst] = await Promise.all([store.laadAlles(state.user), store.laadInstellingen(state.user).catch(() => ({}))]);
-  state.data = data; state.instellingen = inst; zetEigen(inst);
+  state.data = data; state.instellingen = inst; zetEigen(inst); state.temp = null; state.tempFout = null;
   render();
 }
 
@@ -578,6 +646,12 @@ document.addEventListener('click', async (e) => {
     if (huidig.has(j)) { if (huidig.size > 1) huidig.delete(j); } else huidig.add(j);
     state.ui.jaren[s] = [...huidig];
     render(false);
+  } else if (actie === 'plaats-kies') {
+    const k = state.plaatsKeuzes?.[+waarde];
+    if (!k) return;
+    state.plaatsKeuzes = [];
+    state.temp = null; state.tempFout = null;
+    await bewaarInst({ plaats: { naam: k.naam, postcode: k.postcode, provincie: k.provincie, lat: k.lat, lon: k.lon } }, 'plaatsMelding');
   } else if (actie === 'contract-weg') {
     await bewaarInst({ contracten: (state.instellingen.contracten || []).filter((c) => c.id !== waarde) }, 'contractMelding');
   } else if (actie === 'kosten-jaar') {
@@ -591,10 +665,21 @@ document.addEventListener('click', async (e) => {
 
 document.addEventListener('submit', async (e) => {
   const id = e.target.id;
-  if (!['instellingen', 'contractform', 'tariefform'].includes(id)) return;
+  if (!['instellingen', 'contractform', 'tariefform', 'plaatsform'].includes(id)) return;
   e.preventDefault();
   const fd = Object.fromEntries(new FormData(e.target).entries());
   const getal = (k) => (fd[k] === '' || fd[k] == null ? null : parseFloat(fd[k]));
+  if (id === 'plaatsform') {
+    state.plaatsMelding = null;
+    try {
+      const q = (fd.zoek || '').trim();
+      const pc = /^\d{4}$/.test(q) ? q : null;
+      state.plaatsKeuzes = await P.zoekPlaats(q, pc);
+      if (!state.plaatsKeuzes.length) state.plaatsMelding = 'Niets gevonden. Probeer de naam van de gemeente.';
+    } catch (err) { state.plaatsMelding = err.message; }
+    render(false);
+    return;
+  }
   if (id === 'instellingen') {
     const data = { voorschot: null, startMaand: 4, vasteStroomprijs: null, vasteGasprijs: null };
     for (const k of Object.keys(data)) data[k] = k === 'startMaand' ? +fd[k] : getal(k);
@@ -620,6 +705,18 @@ document.addEventListener('submit', async (e) => {
 });
 
 document.addEventListener('change', async (e) => {
+  if (e.target.id === 'factuur') {
+    const f = e.target.files[0];
+    if (!f) return;
+    state.plaatsMelding = 'Factuur lezen…'; state.plaatsKeuzes = []; render(false);
+    try {
+      const a = await P.adresUitFactuur(f);
+      state.plaatsKeuzes = await P.zoekPlaats(a.gemeente, a.postcode);
+      state.plaatsMelding = state.plaatsKeuzes.length ? `Gevonden op de factuur: ${a.postcode} ${a.gemeente}. Kies hieronder.` : `Gevonden op de factuur: ${a.postcode} ${a.gemeente}, maar die gemeente kon niet opgezocht worden.`;
+    } catch (err) { state.plaatsMelding = err.message; }
+    render(false);
+    return;
+  }
   if (e.target.id !== 'bestanden') return;
   state.melding = null;
   state.imports = await Promise.all([...e.target.files].map(async (f) => {
