@@ -144,3 +144,46 @@ body > main > .chips { margin: 0 2px 4px; }
 .conclusies li.slecht::before { background: var(--slecht); }
 .conclusies b { color: #E8EAED; font-weight: 600; }
 .kaart.kern { padding: 0; background: none; border: 0; }
+
+/* ---------- Computer (vanaf 1100 px) ---------- */
+@media (min-width: 1100px) {
+  nav { top: 0; bottom: 0; right: auto; width: 232px; display: flex; flex-direction: column; gap: 2px;
+    padding: 28px 16px; border-top: 0; border-right: 1px solid var(--rand); background: var(--bg); backdrop-filter: none; }
+  nav::before { content: 'Verbruik thuis'; font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 19px;
+    color: #fff; padding: 0 12px 24px; }
+  nav a { flex-direction: row; justify-content: flex-start; gap: 12px; min-height: 42px; padding: 0 12px;
+    border-radius: 10px; font-size: 14px; font-weight: 500; }
+  nav a:hover { color: var(--zacht); background: rgba(255,255,255,.03); }
+  nav a.actief { background: var(--kaart); color: #fff; }
+  nav svg { width: 19px; height: 19px; }
+
+  main { max-width: 1240px; margin: 0 auto; padding: 40px 48px 64px 280px; box-sizing: content-box; gap: 20px; }
+  .terug { display: none; }
+  .kop.rij { gap: 0; }
+  main > .kop h1 { font-size: 32px; }
+  main > .tegels { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+  .indeling { display: flex; flex-direction: column; gap: 20px; }
+  .indeling .rij { display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: 20px; align-items: stretch; }
+  .indeling .stapel { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+  .indeling .stapel > .kaart { flex: 1; }
+  .indeling .kaart { min-width: 0; }
+
+  /* Grafieken: tekst niet mee opblazen */
+  .grafiek .as { font-size: 7px; }
+
+  /* Ringen: naast elkaar op één rij */
+  [data-id="jaren"] .ringen { grid-template-columns: repeat(auto-fit, minmax(160px, 220px)); justify-content: start; gap: 24px 40px; }
+
+  /* Gas per graaddag: uitleg links, grafiek rechts */
+  [data-id="graaddag"] { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); column-gap: 32px; row-gap: 12px; align-items: start; }
+  [data-id="graaddag"] > .kaart-kop { grid-column: 1 / -1; }
+  .gd-tekst, .gd-grafiek { display: grid; gap: 12px; }
+
+  /* Vast of variabel: blokken naast elkaar */
+  .vv-rij { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px; }
+  .vv-rij > .vv + .vv { border-top: 0; padding-top: 0; }
+
+  /* Drukste dagen: naast elkaar */
+  [data-id="drukste"] .conclusies { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}

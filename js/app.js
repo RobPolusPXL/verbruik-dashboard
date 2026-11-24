@@ -127,12 +127,12 @@ function overzicht() {
   </div>
   ${kern ? `<section class="kaart kern">${conclusies([kern])}</section>` : ''}
 
-  ${s || g ? `<section class="kaart">
+  ${s || g ? `<section class="kaart" data-id="ringen">
     <div class="kaart-kop"><h2>Dit jaar tegen vorig jaar</h2><span>t.e.m. ${datumKort((g || s).laatste)}</span></div>
     <div class="ringen">${g ? ringBlok('Gas', g, 'm³', KLEUR.gas) : ''}${s ? ringBlok('Stroom', s, 'kWh', KLEUR.stroom) : ''}</div>
   </section>` : ''}
 
-  ${k ? `<a class="kaart" href="#/kosten">
+  ${k ? `<a class="kaart" data-id="kosten12" href="#/kosten">
     <div class="kaart-kop"><h2>Kosten, laatste ${l12.length} maanden</h2><span>${maandLang(l12[0].maand)} – ${maandLang(l12.at(-1).maand)}</span></div>
     <div class="groot">${eur(k.stroom + k.gas)}</div>${splitBalk(k.split)}
   </a>` : ''}
@@ -171,7 +171,7 @@ function prognoseKaart(p, link) {
       <div><span>Voorschotten (12 ×)</span><b>${eur0(p.betaald)}</b></div>
     </div>
     <p class="uitleg">Schatting: ${p.echteDagen} dagen echt verbruik, ${p.geschatteDagen} dagen aangevuld met het verbruik van een jaar eerder, aan de laatst gekende prijzen.</p>`;
-  return link ? `<a class="kaart" href="#/kosten">${inhoud}</a>` : `<section class="kaart">${inhoud}</section>`;
+  return link ? `<a class="kaart" data-id="prognose" href="#/kosten">${inhoud}</a>` : `<section class="kaart" data-id="prognose">${inhoud}</section>`;
 }
 
 // ---------- Stroom en gas ----------
@@ -181,7 +181,7 @@ function jarenRingen(dagen, e, y) {
   const nu = jaren.find((j) => j.jaar === y.jaar);
   const vorige = jaren.filter((j) => j.jaar < y.jaar).reverse();
   if (!nu || !vorige.length) return '';
-  return `<section class="kaart"><div class="kaart-kop"><h2>${y.jaar} tegen vorige jaren</h2><span>1 jan – ${datumKort(y.laatste)}</span></div>
+  return `<section class="kaart" data-id="jaren"><div class="kaart-kop"><h2>${y.jaar} tegen vorige jaren</h2><span>1 jan – ${datumKort(y.laatste)}</span></div>
     <div class="ringen">${vorige.map((v) => {
       const pct = (nu.totaal / v.totaal - 1) * 100;
       return `<div class="ring-blok">
@@ -208,7 +208,7 @@ function uurKaart(soort, uren, e, eenheidUur) {
   const vorige = beschikbaar.filter((m) => m < huidig).at(-1) ?? null;
   const volgende = keuze ? (beschikbaar.filter((m) => m > keuze && m < laatsteMaand).at(0) ?? 'laatste') : null;
   const gem = Array.from({ length: 24 }, (_, u) => dagenLijst.reduce((a, d) => a + (uren[d][u] ?? 0), 0) / dagenLijst.length);
-  return `<section class="kaart">
+  return `<section class="kaart" data-id="uur">
     <div class="kaart-kop bladeren">
       <button type="button" class="pijl" data-actie="uur-vorige" data-soort="${soort}" data-waarde="${vorige ?? ''}" ${vorige ? '' : 'disabled'} aria-label="Vorige maand">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
@@ -217,7 +217,8 @@ function uurKaart(soort, uren, e, eenheidUur) {
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
     </div>
     ${heatmap(dagenLijst.map((d) => ({ label: datumKort(d), waarden: uren[d] })), e.rgb, (v) => `${f2(v)} ${eenheidUur}`, `${e.naam} per uur, één rij per dag`)}
-    <h3 class="tussenkop">Gemiddelde dag</h3>
+  </section>
+  <section class="kaart" data-id="dagprofiel"><div class="kaart-kop"><h2>Gemiddelde dag</h2><span>${esc(titel.toLowerCase())}</span></div>
     ${dagprofiel(gem, e.kleur, (v) => `${f2(v)} ${eenheidUur}`, `Gemiddeld ${e.naam.toLowerCase()}verbruik per uur van de dag`)}
     ${conclusies(A.uurConclusies(soort, dagenLijst, uren, state.data.dagen, state.weer, (v) => `${f2(v)} ${eenheidUur}`))}
   </section>`;
@@ -243,22 +244,22 @@ function energieScherm(soort) {
     const pc = A.piekConclusie(pieken, (NET.stroom[new Date().getFullYear()] ?? Object.values(NET.stroom).at(-1)).capaciteit, MIN_PIEK);
     const top = A.uitschieters(dagen, A.stroomKwh);
     extra = `
-    ${piekReeksen.length ? `<section class="kaart"><div class="kaart-kop"><h2>Maandpiek</h2>${legende(piekReeksen)}</div>
+    ${piekReeksen.length ? `<section class="kaart" data-id="piek"><div class="kaart-kop"><h2>Maandpiek</h2>${legende(piekReeksen)}</div>
       <p class="uitleg">Hoogste kwartiervermogen per maand. Telt mee in het capaciteitstarief.</p>
       ${lijnen(piekReeksen, MND, (v) => `${f2(v)} kW`, 'Maandpiek per jaar')}
       ${pc ? conclusies([
         { t: `Je hoogste piek van de laatste 12 maanden was <b>${f2(pc.topKw)} kW</b> in ${maandVol(pc.top)}.` },
         { t: `Je capaciteitstarief rekent met het gemiddelde van die 12 pieken: <b>${f2(pc.rollend)} kW</b>, ongeveer <b>${eur0(pc.kost)}</b> per jaar. Elke kW lager scheelt <b>${eur0(pc.perKw)}</b> per jaar: niet tegelijk koken, wassen en drogen helpt.` },
       ]) : ''}</section>` : ''}
-    ${top ? `<section class="kaart"><div class="kaart-kop"><h2>Drukste dagen</h2><span>laatste 12 maanden</span></div>
+    ${top ? `<section class="kaart" data-id="drukste"><div class="kaart-kop"><h2>Drukste dagen</h2><span>laatste 12 maanden</span></div>
       ${conclusies(top.top.map(([d, v]) => ({ t: `<b>${DAG[new Date(d + 'T12:00:00Z').getUTCDay()]} ${datumJaar(d)}</b>: ${f1(v)} kWh, ${f1(v / top.mediaan)}× een gewone dag (${f1(top.mediaan)} kWh)` })))}</section>` : ''}
-    <section class="kaart"><div class="kaart-kop"><h2>Sluipverbruik</h2>${sluip ? `<span>laatste ${sluip.nachten} nachten</span>` : ''}</div>
+    <section class="kaart" data-id="sluip"><div class="kaart-kop"><h2>Sluipverbruik</h2>${sluip ? `<span>laatste ${sluip.nachten} nachten</span>` : ''}</div>
       ${sluip ? `<div class="groot">${f0(sluip.watt)}<small>W</small></div>
         <p class="uitleg">Zoveel verbruikt je huis zelfs 's nachts, als alles uit lijkt: koelkast, diepvries, router, toestellen op stand-by.
         Die blijven ook overdag aanstaan, dus 24 uur op 24. Op een jaar is dat ongeveer <b>${f0(sluip.jaarKwh)} kWh</b>${sluip.jaarEur ? ` of <b>${eur0(sluip.jaarEur)}</b>` : ''}:
         <b>${f0(sluip.jaarKwh / (y.nu / y.detail.nu.aantalDagen * 365) * 100)}%</b> van al je stroom gaat naar toestellen die altijd aanstaan.</p>`
         : '<p class="uitleg">Laad je stroomexport met <b>kwartiertotalen</b> (opnieuw) in om je sluipverbruik te zien.</p>'}</section>
-    <section class="kaart"><div class="kaart-kop"><h2>Dag en nacht, ${y.jaar}</h2></div>
+    <section class="kaart" data-id="dagnacht"><div class="kaart-kop"><h2>Dag en nacht, ${y.jaar}</h2></div>
       ${splitBalk([{ naam: 'Dag', v: dag, kleur: KLEUR.stroom }, { naam: 'Nacht', v: nacht, kleur: '#7A6A2E' }], (v) => `${f0(v)} kWh`)}</section>`;
   } else {
     extra = weerKaart();
@@ -271,14 +272,14 @@ function energieScherm(soort) {
   <div class="kop-getal"><div class="groot" style="color:${e.kleur}">${e.fmt(y.nu)}<small>${e.eenheid}</small></div>
     <div>${delta(y.pct)} <span class="sub">t.o.v. ${y.jaar - 1}, t.e.m. ${datumKort(y.laatste)}</span></div></div>
   ${jarenRingen(dagen, e, y)}
-  <section class="kaart"><div class="kaart-kop"><h2>Per maand</h2></div>${jaarChips}${legende(reeksen)}
+  <section class="kaart" data-id="maand"><div class="kaart-kop"><h2>Per maand</h2></div>${jaarChips}${legende(reeksen)}
     ${gegroepeerd(reeksen, MAAND_VOL, (v) => `${e.fmt(v)} ${e.eenheid}`, `${e.naam}verbruik per maand per jaar`)}</section>
-  <section class="kaart"><div class="kaart-kop"><h2>Per jaar</h2></div>
+  <section class="kaart" data-id="jaar"><div class="kaart-kop"><h2>Per jaar</h2></div>
     ${gestapeld(totalen.map((t) => ({ label: String(t.jaar), kort: `'${String(t.jaar).slice(2)}`, onvolledig: t.dagen < 365,
       delen: [{ naam: e.naam.toLowerCase(), waarde: t.som, kleur: e.kleur }] })), (v) => `${e.fmt(v)} ${e.eenheid}`, `${e.naam}verbruik per jaar`)}
     ${totalen.some((t) => t.dagen < 365) ? '<p class="uitleg">Lichtere staven zijn onvolledige jaren.</p>' : ''}</section>
-  ${uk ?? (soort === 'stroom' ? '<section class="kaart"><p class="uitleg">Laad je stroomexport met <b>kwartiertotalen</b> (opnieuw) in om je verbruik per uur te zien.</p></section>'
-    : '<section class="kaart"><p class="uitleg">Laad een gasexport met <b>uurtotalen</b> in om je verbruik per uur te zien.</p></section>')}
+  ${uk ?? (soort === 'stroom' ? '<section class="kaart" data-id="uur"><p class="uitleg">Laad je stroomexport met <b>kwartiertotalen</b> (opnieuw) in om je verbruik per uur te zien.</p></section>'
+    : '<section class="kaart" data-id="uur"><p class="uitleg">Laad een gasexport met <b>uurtotalen</b> in om je verbruik per uur te zien.</p></section>')}
   ${extra}`;
 }
 
@@ -286,21 +287,21 @@ function energieScherm(soort) {
 function weerKaart() {
   if (!state.weer && !state.weerFout) {
     if (!state.weerBezig) laadWeer();
-    return '<section class="kaart"><div class="kaart-kop"><h2>Gas per graaddag</h2></div><p class="uitleg">Weergegevens laden…</p></section>';
+    return '<section class="kaart" data-id="graaddag"><div class="kaart-kop"><h2>Gas per graaddag</h2></div><p class="uitleg">Weergegevens laden…</p></section>';
   }
-  if (state.weerFout) return `<section class="kaart"><div class="kaart-kop"><h2>Gas per graaddag</h2></div><p class="uitleg">${esc(state.weerFout)}</p></section>`;
+  if (state.weerFout) return `<section class="kaart" data-id="graaddag"><div class="kaart-kop"><h2>Gas per graaddag</h2></div><p class="uitleg">${esc(state.weerFout)}</p></section>`;
   const r = A.gasPerGraaddag(state.data.dagen, state.weer);
   const beschikbaar = [...new Set(Object.keys(r.perMaand).map((m) => +m.slice(0, 4)))].sort();
   const reeksen = jaarReeksen(r.perMaand, gekozenJaren('gas', beschikbaar).filter((j) => beschikbaar.includes(j)), KLEUR.gas);
   const pct = r.recent && r.vorigJaar ? (r.recent.perGd / r.vorigJaar.perGd - 1) * 100 : null;
-  return `<section class="kaart"><div class="kaart-kop"><h2>Gas per graaddag</h2></div>
-    <p class="uitleg">Je gasverbruik gedeeld door hoe koud het was. Zo vergelijk je eerlijk, los van een zachte of strenge winter: lager is zuiniger.</p>
+  return `<section class="kaart" data-id="graaddag"><div class="kaart-kop"><h2>Gas per graaddag</h2></div>
+    <div class="gd-tekst"><p class="uitleg">Je gasverbruik gedeeld door hoe koud het was. Zo vergelijk je eerlijk, los van een zachte of strenge winter: lager is zuiniger.</p>
     ${r.recent ? `<div class="vergelijk">
       <div><span>Laatste 30 dagen</span><b>${f2(r.recent.perGd * 100)} <small>m³ / 100 gd</small></b></div>
       <div><span>Zelfde periode vorig jaar</span><b>${r.vorigJaar ? `${f2(r.vorigJaar.perGd * 100)} <small>m³ / 100 gd</small>` : '—'}</b></div>
-    </div>${pct != null ? `<p class="uitleg">${delta(pct)} t.o.v. vorig jaar, gecorrigeerd voor de temperatuur.</p>` : ''}` : ''}
-    ${reeksen.length ? `${legende(reeksen)}${gegroepeerd(reeksen, MAAND_VOL, (v) => `${f2(v * 100)} m³ per 100 graaddagen`, 'Gas per graaddag per maand')}
-    <p class="uitleg">Alleen stookmaanden. Graaddagen t.o.v. 16,5 °C, temperatuur in Zonhoven via Open-Meteo.</p>` : ''}
+    </div>${pct != null ? `<p class="uitleg">${delta(pct)} t.o.v. vorig jaar, gecorrigeerd voor de temperatuur.</p>` : ''}` : ''}</div>
+    ${reeksen.length ? `<div class="gd-grafiek">${legende(reeksen)}${gegroepeerd(reeksen, MAAND_VOL, (v) => `${f2(v * 100)} m³ per 100 graaddagen`, 'Gas per graaddag per maand')}
+    <p class="uitleg">Alleen stookmaanden. Graaddagen t.o.v. 16,5 °C, temperatuur in Zonhoven via Open-Meteo.</p></div>` : ''}
   </section>`;
 }
 
@@ -346,18 +347,18 @@ function kostenScherm() {
   ${chips([{ waarde: 'laatste', label: '12 maanden' }, ...jaren.map((j) => ({ waarde: j, label: j }))], (w) => w === keuze, 'kosten-jaar', 'Periode')}
   ${k ? `<div class="kop-getal"><div class="sub">${esc(titel)}, incl. btw</div><div class="groot">${eur(k.stroom + k.gas)}</div>
     <div class="legende"><span><i style="background:${KLEUR.stroom}"></i>Stroom ${eur(k.stroom)}</span><span><i style="background:${KLEUR.gas}"></i>Gas ${eur(k.gas)}</span></div></div>` : ''}
-  <section class="kaart"><div class="kaart-kop"><h2>Per maand</h2></div>
+  <section class="kaart" data-id="kmaand"><div class="kaart-kop"><h2>Per maand</h2></div>
     ${gestapeld(kol, eur, 'Kosten per maand, stroom en gas gestapeld')}
     ${(() => { const c = A.kostenConclusies(selectie); return c ? conclusies([
       { t: `Duurste maand: <b>${maandVol(c.duurst.maand)}</b> (${eur0(c.duurst.eur)}), goedkoopste: <b>${maandVol(c.goedkoopst.maand)}</b> (${eur0(c.goedkoopst.eur)}).` },
       ...(c.winterAandeel != null ? [{ t: `December tot februari zijn samen goed voor <b>${Math.round(c.winterAandeel * 100)}%</b> van je gaskosten in deze periode.` }] : []),
     ]) : ''; })()}
     ${zonderIndex.length ? `<p class="uitleg">Stroom van ${zonderIndex.map((m) => maandLang(m.maand)).join(', ')} volgt zodra de beursindex van die maand gepubliceerd is.</p>` : ''}</section>
-  ${k ? `<section class="kaart"><div class="kaart-kop"><h2>Waar betaal je voor?</h2></div>${splitBalk(k.split)}</section>` : ''}
-  <section class="kaart"><div class="kaart-kop"><h2>Jaar na jaar</h2></div>
+  ${k ? `<section class="kaart" data-id="split"><div class="kaart-kop"><h2>Waar betaal je voor?</h2></div>${splitBalk(k.split)}</section>` : ''}
+  <section class="kaart" data-id="kjaar"><div class="kaart-kop"><h2>Jaar na jaar</h2></div>
     ${gestapeld(perJaar, eur, 'Kosten per jaar, stroom en gas gestapeld')}
     <p class="uitleg">Lichtere staven zijn onvolledige jaren. De kosten worden berekend vanaf april 2025.</p></section>
-  ${p ? prognoseKaart(p, false) : `<section class="kaart"><h2>Verwachte jaarafrekening</h2><p class="uitleg">Vul je maandelijkse voorschot in bij <a href="#/import"><b>Gegevens</b></a> om te zien of je geld terugkrijgt of moet bijbetalen.</p></section>`}
+  ${p ? prognoseKaart(p, false) : `<section class="kaart" data-id="prognose"><h2>Verwachte jaarafrekening</h2><p class="uitleg">Vul je maandelijkse voorschot in bij <a href="#/import"><b>Gegevens</b></a> om te zien of je geld terugkrijgt of moet bijbetalen.</p></section>`}
   ${vastVariabelKaart(kosten)}
   <p class="uitleg los">Berekend per dag met de tariefkaart van je contract, de gepubliceerde beursindex van de maand en de nettarieven van Fluvius Limburg. April 2025 – maart 2026 is gecontroleerd met je jaarafrekening.</p>`;
 }
@@ -379,14 +380,14 @@ function vastVariabelKaart(kosten) {
   if (s) h += regel('Stroom: jouw contract tegen een vaste prijs', 'Jouw contract', s.echt, `Vast aan ${f2(ps)} c€/kWh`, s.alt, `Alleen de energieprijs, ${maandLang(s.van)} – ${maandLang(s.tot)}.`);
   if (g2) h += regel('Gas: jouw contract tegen een vaste prijs', 'Jouw contract', g2.echt, `Vast aan ${f2(pg)} c€/kWh`, g2.alt, `Alleen de energieprijs, ${maandLang(g2.van)} – ${maandLang(g2.tot)}.`);
   if (!s && !g2) h += '<p class="uitleg">Vul bij <a href="#/import"><b>Gegevens</b></a> de prijs van een vast aanbod in (c€/kWh incl. btw, van een tariefkaart) om het met je huidige contract te vergelijken.</p>';
-  return `<section class="kaart"><div class="kaart-kop"><h2>Vast of variabel?</h2></div>${h}</section>`;
+  return `<section class="kaart" data-id="vastvar"><div class="kaart-kop"><h2>Vast of variabel?</h2></div><div class="vv-rij">${h}</div></section>`;
 }
 
 // ---------- Gegevens ----------
 function importScherm() {
   const imps = state.imports, i = state.instellingen;
   return `${detailKop('Gegevens')}
-  <section class="kaart">
+  <section class="kaart" data-id="import">
     <h2>Fluvius-export inladen</h2>
     <ol class="stappen">
       <li>Mijn Fluvius → Verbruik → exporteer als CSV.</li>
@@ -399,7 +400,7 @@ function importScherm() {
       <button type="button" class="knop primair" id="opslaan" ${state.bezig || !imps.some((x) => !x.fout) ? 'disabled' : ''}>${state.bezig ? 'Bezig…' : 'Opslaan'}</button>` : ''}
     ${state.melding ? `<p class="melding">${esc(state.melding)}</p>` : ''}
   </section>
-  <form class="kaart" id="instellingen">
+  <form class="kaart" data-id="instellingen" id="instellingen">
     <h2>Instellingen</h2>
     <label class="veld"><span>Maandelijks voorschot (€, incl. btw)</span><input name="voorschot" type="number" inputmode="decimal" step="0.01" min="0" value="${esc(i.voorschot ?? '')}"></label>
     <label class="veld"><span>Afrekeningsperiode begint in</span><select name="startMaand">${MAAND_VOL.map((m, n) => `<option value="${n + 1}" ${(+(i.startMaand ?? 4)) === n + 1 ? 'selected' : ''}>${m}</option>`).join('')}</select></label>
@@ -408,7 +409,7 @@ function importScherm() {
     <button type="submit" class="knop">Bewaren</button>
     ${state.instMelding ? `<p class="melding">${esc(state.instMelding)}</p>` : ''}
   </form>
-  <section class="kaart">
+  <section class="kaart" data-id="account">
     <h2>Account</h2>
     <p class="uitleg">Aangemeld als ${esc(state.user.email || state.user.displayName || '')}. ${Object.keys(state.data.dagen).length} dagen opgeslagen.</p>
     ${state.user.demo ? '' : '<button type="button" class="knop" id="afmelden">Afmelden</button>'}
@@ -425,8 +426,51 @@ function render(boven = true) {
   if (!state.data) { $view.innerHTML = '<div class="laden">Laden…</div>'; return; }
   const y = scrollY;
   $view.innerHTML = (ROUTES[route] || overzicht)();
+  indelen(route);
   if (boven) scrollTo(0, 0); else scrollTo(0, y);
 }
+
+// ---------- Computer ----------
+// Vaste indeling per scherm: elke rij bevat kaarten van dezelfde soort, zodat ze even hoog zijn.
+// Een rij is een lijst van vakken; een vak is één kaart of een lijst kaarten onder elkaar.
+const INDELING = {
+  '': [['ringen', 'kosten12', 'prognose']],
+  stroom: [['jaren'], ['maand', 'jaar'], ['uur', 'dagprofiel'], ['piek', ['sluip', 'dagnacht']], ['drukste']],
+  gas: [['jaren'], ['maand', 'jaar'], ['uur', 'dagprofiel'], ['graaddag']],
+  kosten: [['kmaand', 'kjaar'], ['split', 'prognose'], ['vastvar']],
+  import: [['import', ['instellingen', 'account']]],
+};
+const COMPUTER = matchMedia('(min-width: 1100px)');
+function indelen(route) {
+  if (!COMPUTER.matches) return;
+  const spec = INDELING[route] ?? INDELING[''];
+  const kaarten = Object.fromEntries([...$view.querySelectorAll(':scope > [data-id]')].map((k) => [k.dataset.id, k]));
+  const eerste = $view.querySelector(':scope > [data-id]');
+  if (!eerste) return;
+  const blok = document.createElement('div');
+  blok.className = 'indeling';
+  $view.insertBefore(blok, eerste);
+  const gebruikt = new Set();
+  const neem = (id) => { const k = kaarten[id]; if (k && !gebruikt.has(id)) { gebruikt.add(id); return k; } return null; };
+  for (const rij of spec) {
+    const vakken = rij.map((v) => {
+      const ks = (Array.isArray(v) ? v : [v]).map(neem).filter(Boolean);
+      if (!ks.length) return null;
+      if (ks.length === 1) return ks[0];
+      const st = document.createElement('div'); st.className = 'stapel'; st.append(...ks); return st;
+    }).filter(Boolean);
+    if (!vakken.length) continue;
+    const r = document.createElement('div');
+    r.className = 'rij'; r.style.setProperty('--n', vakken.length);
+    r.append(...vakken); blok.append(r);
+  }
+  const rest = Object.keys(kaarten).filter((id) => !gebruikt.has(id)).map((id) => kaarten[id]);
+  for (let i = 0; i < rest.length; i += 2) {
+    const r = document.createElement('div'); r.className = 'rij';
+    r.style.setProperty('--n', Math.min(2, rest.length - i)); r.append(...rest.slice(i, i + 2)); blok.append(r);
+  }
+}
+COMPUTER.addEventListener('change', () => render(false));
 
 function loginScherm() {
   if (state.fout === 'config') return '<section class="leeg"><h2>Firebase is nog niet ingesteld</h2><p>Vul <code>firebase-config.js</code> in (zie README).</p></section>';
