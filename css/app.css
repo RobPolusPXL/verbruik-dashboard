@@ -22,6 +22,7 @@ main { max-width: 560px; margin: 0 auto; padding: calc(env(safe-area-inset-top) 
 .terug svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
 .tegels { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.tegels.vier { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .tegel { background: var(--kaart); border: 1px solid var(--rand); border-radius: 16px; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
 .tl { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--mute); }
 .tl i, .legende i, .splitlegende i { width: 8px; height: 8px; border-radius: 3px; display: inline-block; flex: none; }
@@ -86,7 +87,7 @@ main { max-width: 560px; margin: 0 auto; padding: calc(env(safe-area-inset-top) 
 .login .logo svg { width: 88px; height: 88px; }
 .laden { text-align: center; padding: 80px 0; color: var(--mute); }
 
-nav { position: fixed; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); background: rgba(18, 21, 27, .92); backdrop-filter: blur(12px); border-top: 1px solid var(--rand); padding: 6px 6px calc(6px + env(safe-area-inset-bottom)); }
+nav { position: fixed; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); background: rgba(18, 21, 27, .92); backdrop-filter: blur(12px); border-top: 1px solid var(--rand); padding: 6px 6px calc(6px + env(safe-area-inset-bottom)); }
 nav a { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 48px; font-size: 11px; color: var(--mute); }
 nav a.actief { color: #fff; }
 nav svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
@@ -162,6 +163,7 @@ body > main > .chips { margin: 0 2px 4px; }
   .kop.rij { gap: 0; }
   main > .kop h1 { font-size: 32px; }
   main > .tegels { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  main > .tegels.vier { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 
   .indeling { display: flex; flex-direction: column; gap: 20px; }
   .indeling .rij { display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: 20px; align-items: stretch; }

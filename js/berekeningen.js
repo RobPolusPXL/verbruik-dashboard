@@ -5,6 +5,7 @@ import { TTF_RLP } from './indexen.js';
 
 export const stroomKwh = (v) => (v.sd != null || v.sn != null ? (v.sd ?? 0) + (v.sn ?? 0) : null);
 export const gasM3 = (v) => v.gm ?? null;
+export const waterL = (v) => v.wl ?? null;
 
 export const dagenInMaand = (ym) => new Date(Date.UTC(+ym.slice(0, 4), +ym.slice(5, 7), 0)).getUTCDate();
 const plusDagen = (d, n) => new Date(Date.parse(d + 'T00:00:00Z') + n * 864e5).toISOString().slice(0, 10);
@@ -190,6 +191,18 @@ export function uurConclusies(soort, dagenLijst, uren, dagen, fmt) {
   const nacht = gem(prof.slice(0, 6)), dag = gem(prof.slice(7, 23));
   const blok = drukstBlok(prof);
   const uit = [];
+  if (soort === 'water') {
+    uit.push({ t: `Het meeste water gebruik je tussen <b>${uurTxt(blok.van)} en ${uurTxt(blok.tot)}</b> (gemiddeld ${fmt(blok.waarde)} per uur).` });
+    const we = dagenLijst.filter((d) => [0, 6].includes(new Date(d + 'T12:00:00Z').getUTCDay()));
+    const wk = dagenLijst.filter((d) => !we.includes(d));
+    if (we.length >= 2 && wk.length >= 3) {
+      const t = (d) => uren[d].reduce((a, b) => a + b, 0);
+      uit.push({ t: `Gemiddeld per dag: <b>${fmt(gem(wk.map(t)))}</b> in de week, <b>${fmt(gem(we.map(t)))}</b> in het weekend.` });
+    }
+    const vj = tegenVorigJaar(soort, dagenLijst, dagen);
+    if (vj) uit.push(vj);
+    return uit;
+  }
   if (soort === 'gas') {
     const totaal = gem(dagenLijst.map((d) => uren[d].reduce((a, b) => a + b, 0)));
     if (totaal < 0.5) return [{ t: 'De verwarming stond in deze periode zo goed als uit.' }];
@@ -227,7 +240,7 @@ const vorigJaarDag = (d) => `${+d.slice(0, 4) - 1}${d.slice(4)}`;
 
 // Dezelfde dagen een jaar eerder: gewoon het gemeten verbruik.
 export function tegenVorigJaar(soort, dagenLijst, dagen) {
-  const w = soort === 'stroom' ? stroomKwh : gasM3;
+  const w = soort === 'stroom' ? stroomKwh : soort === 'water' ? waterL : gasM3;
   const ok = dagenLijst.map((d) => [d, vorigJaarDag(d)]).filter(([a, b]) => dagen[a] && dagen[b] && w(dagen[a]) != null && w(dagen[b]) != null);
   if (ok.length < dagenLijst.length * 0.8) return null;
   const nu = ok.reduce((s, [a]) => s + w(dagen[a]), 0), toen = ok.reduce((s, [, b]) => s + w(dagen[b]), 0);
@@ -271,4 +284,11 @@ export function kostenConclusies(maanden) {
     duurst: { maand: duurst.maand, eur: tot(duurst) }, goedkoopst: { maand: goedkoopst.maand, eur: tot(goedkoopst) },
     winterAandeel: winter.length === 3 && gasTot ? winterGas / gasTot : null,
   };
+}
+
+// Lekcontrole: een nacht is verdacht als er tussen 1 en 5 uur geen enkel uur zonder waterverbruik was.
+export function lekNachten(dagenLijst, uren) {
+  const nachten = dagenLijst.filter((d) => uren[d] && uren[d].slice(1, 5).length === 4);
+  const verdachteDagen = nachten.filter((d) => Math.min(...uren[d].slice(1, 5)) > 0);
+  return { nachten: nachten.length, verdacht: verdachteDagen.length, dagen: verdachteDagen };
 }

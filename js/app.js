@@ -1,12 +1,13 @@
 import * as store from './store.js';
 import { parseFluvius } from './fluvius.js';
+import { parseWater, isWater } from './water.js';
 import { kostenPerMaand, ontbreekt } from './kosten.js';
 import { MIN_PIEK, contracten, netVoor, kiesProfiel, heeftProfiel } from './tarieven.js';
 import * as A from './berekeningen.js';
 import * as P from './plaats.js';
 import { esc, ring, gegroepeerd, gestapeld, lijnen, heatmap, dagprofiel } from './charts.js';
 
-const KLEUR = { stroom: '#F5C542', gas: '#FF8A4C', ok: '#5BD68A', slecht: '#F2A65A' };
+const KLEUR = { stroom: '#F5C542', gas: '#FF8A4C', water: '#4FA3F7', ok: '#5BD68A', slecht: '#F2A65A' };
 const OUDE_JAREN = ['#3A414D', '#5B6472', '#9AA3AE']; // van oud naar recent; het nieuwste gekozen jaar krijgt de accentkleur
 const MND = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'];
 const MAAND_VOL = ['januari', 'februari', 'maart', 'april', 'mei', 'juni', 'juli', 'augustus', 'september', 'oktober', 'november', 'december'];
@@ -30,6 +31,7 @@ const state = {
 const ENERGIE = {
   stroom: { naam: 'Stroom', waarde: A.stroomKwh, eenheid: 'kWh', fmt: f0, fmtD: f1, kleur: KLEUR.stroom, rgb: '245, 197, 66' },
   gas: { naam: 'Gas', waarde: A.gasM3, eenheid: 'm³', fmt: f1, fmtD: f2, kleur: KLEUR.gas, rgb: '255, 138, 76' },
+  water: { naam: 'Water', waarde: A.waterL, eenheid: 'l', fmt: f0, fmtD: f0, kleur: KLEUR.water, rgb: '79, 163, 247' },
 };
 
 // ---------- kleine bouwstenen ----------
@@ -112,17 +114,24 @@ function overzicht() {
   const l12 = laatste12(kosten);
   const k = l12.length ? kostenVan(l12) : null;
   const p = heeftProfiel() ? A.prognose(state.data, state.instellingen) : null;
+  const w = A.ytd(dagen, A.waterL);
+  const wuren = state.data.wuren || {};
+  const lek = A.lekNachten(Object.keys(wuren).sort().slice(-3), wuren);
 
   return `
   <header class="kop"><div class="sub">${DAG[nu.getDay()]} ${nu.getDate()} ${MND[nu.getMonth()]}</div><h1>Thuis</h1></header>
-  <div class="tegels">
+  <div class="tegels${w ? ' vier' : ''}">
     ${s ? `<a class="tegel" href="#/stroom"><div class="tl"><i style="background:${KLEUR.stroom}"></i>Stroom</div>
       <div class="tw">${f1(A.stroomKwh(dagen[s.laatste]))}<small>kWh</small></div><div class="td">${datumKort(s.laatste)}</div></a>` : ''}
     ${g ? `<a class="tegel" href="#/gas"><div class="tl"><i style="background:${KLEUR.gas}"></i>Gas</div>
       <div class="tw">${f1(A.gasM3(dagen[g.laatste]))}<small>m³</small></div><div class="td">${datumKort(g.laatste)}</div></a>` : ''}
     ${ymNu ? `<a class="tegel" href="#/stroom"><div class="tl"><i style="background:${KLEUR.stroom}"></i>Piek</div>
       <div class="tw">${f2(pieken[ymNu])}<small>kW</small></div><div class="td">${maandLang(ymNu)}</div></a>` : ''}
+    ${w ? `<a class="tegel" href="#/water"><div class="tl"><i style="background:${KLEUR.water}"></i>Water</div>
+      <div class="tw">${f0(A.waterL(dagen[w.laatste]))}<small>l</small></div><div class="td">${datumKort(w.laatste)}</div></a>` : ''}
   </div>
+  ${lek.verdacht ? `<a class="kaart let-op" data-id="lekalarm" href="#/water"><div class="kaart-kop"><h2>Mogelijk waterlek</h2></div>
+    ${conclusies([{ t: `De laatste ${lek.nachten} nachten liep er ${lek.verdacht === lek.nachten ? 'elke nacht' : `${lek.verdacht} keer`} tussen 1u en 5u elk uur water. Controleer wc en kranen.`, toon: 'slecht' }])}</a>` : ''}
 
   ${contractStatusKaart()}
 
@@ -214,6 +223,19 @@ function jarenRingen(dagen, e, y) {
     }).join('')}</div></section>`;
 }
 
+// ---------- Water ----------
+function lekKaart(wuren) {
+  const ds = Object.keys(wuren).sort().slice(-14);
+  if (ds.length < 3) return '';
+  const l = A.lekNachten(ds, wuren);
+  const items = l.verdacht
+    ? [{ t: `<b>${l.verdacht} van de laatste ${l.nachten} nachten</b> liep er tussen 1u en 5u elk uur water: ${l.dagen.map(datumKort).join(', ')}. Dat wijst op een lekkende wc of kraan.`, toon: 'slecht' }]
+    : [{ t: `Geen lek: de laatste ${l.nachten} nachten was er tussen 1u en 5u telkens minstens één uur zonder verbruik.`, toon: 'ok' }];
+  return `<section class="kaart" data-id="lek"><div class="kaart-kop"><h2>Lekcontrole</h2><span>laatste ${l.nachten} nachten</span></div>
+    ${conclusies(items)}
+    <p class="uitleg">Een lekkende wc of kraan loopt dag en nacht. Als er 's nachts geen enkel uur zonder verbruik is, klopt er iets niet.</p></section>`;
+}
+
 // ---------- Buitentemperatuur ----------
 const plaatsVan = () => state.instellingen.plaats || null;
 function tempNodig() {
@@ -281,6 +303,7 @@ function plaatsKaart() {
 }
 
 function uurKaart(soort, uren, e, eenheidUur) {
+  const fu = soort === 'water' ? f1 : f2;
   const beschikbaar = [...new Set(Object.keys(uren).map((d) => d.slice(0, 7)))].sort();
   if (!beschikbaar.length) return null;
   const keuze = state.ui.uurMaand[soort] ?? null; // null = laatste 3 weken
@@ -306,17 +329,17 @@ function uurKaart(soort, uren, e, eenheidUur) {
       <button type="button" class="pijl" data-actie="uur-volgende" data-soort="${soort}" data-waarde="${volgende ?? ''}" ${volgende ? '' : 'disabled'} aria-label="Volgende">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
     </div>
-    ${heatmap(dagenLijst.map((d) => ({ label: datumKort(d), waarden: uren[d] })), e.rgb, (v) => `${f2(v)} ${eenheidUur}`, `${e.naam} per uur, één rij per dag`)}
+    ${heatmap(dagenLijst.map((d) => ({ label: datumKort(d), waarden: uren[d] })), e.rgb, (v) => `${fu(v)} ${eenheidUur}`, `${e.naam} per uur, één rij per dag`)}
   </section>
   <section class="kaart" data-id="dagprofiel"><div class="kaart-kop"><h2>Gemiddelde dag</h2><span>${esc(titel.toLowerCase())}</span></div>
-    ${dagprofiel(gem, e.kleur, (v) => `${f2(v)} ${eenheidUur}`, `Gemiddeld ${e.naam.toLowerCase()}verbruik per uur van de dag`)}
-    ${conclusies([...A.uurConclusies(soort, dagenLijst, uren, state.data.dagen, (v) => `${f2(v)} ${eenheidUur}`), ...(soort === 'gas' ? tempZin(dagenLijst) : [])])}
+    ${dagprofiel(gem, e.kleur, (v) => `${fu(v)} ${eenheidUur}`, `Gemiddeld ${e.naam.toLowerCase()}verbruik per uur van de dag`)}
+    ${conclusies([...A.uurConclusies(soort, dagenLijst, uren, state.data.dagen, (v) => `${fu(v)} ${eenheidUur}`), ...(soort === 'gas' ? tempZin(dagenLijst) : [])])}
   </section>`;
 }
 
 function energieScherm(soort) {
   const e = ENERGIE[soort];
-  const { dagen, pieken, uren, suren } = state.data;
+  const { dagen, pieken, uren, suren, wuren = {} } = state.data;
   const y = A.ytd(dagen, e.waarde);
   if (!y) return detailKop(e.naam) + leegScherm();
   const beschikbaar = A.jaren(dagen, e.waarde);
@@ -354,21 +377,23 @@ function energieScherm(soort) {
       ${splitBalk([{ naam: 'Dag', v: dag, kleur: KLEUR.stroom }, { naam: 'Nacht', v: nacht, kleur: '#7A6A2E' }], (v) => `${f0(v)} kWh`)}</section>`;
   }
 
-  const uurData = soort === 'gas' ? uren : suren;
-  const uk = uurKaart(soort, uurData, e, soort === 'gas' ? 'm³' : 'kWh');
+  const uurData = soort === 'gas' ? uren : soort === 'water' ? wuren : suren;
+  const uk = uurKaart(soort, uurData, e, soort === 'gas' ? 'm³' : soort === 'water' ? 'l' : 'kWh');
+  if (soort === 'water') extra = lekKaart(wuren);
 
   return `${detailKop(e.naam)}
   <div class="kop-getal"><div class="groot" style="color:${e.kleur}">${e.fmt(y.nu)}<small>${e.eenheid}</small></div>
-    <div>${delta(y.pct)} <span class="sub">t.o.v. ${y.jaar - 1}, t.e.m. ${datumKort(y.laatste)}</span></div></div>
+    <div>${y.vorig ? `${delta(y.pct)} <span class="sub">t.o.v. ${y.jaar - 1}, t.e.m. ${datumKort(y.laatste)}</span>` : `<span class="sub">${y.jaar}, t.e.m. ${datumKort(y.laatste)}</span>`}</div></div>
   ${jarenRingen(dagen, e, y)}
   <section class="kaart" data-id="maand"><div class="kaart-kop"><h2>Per maand</h2></div>${jaarChips}${legende(reeksen)}
     ${gegroepeerd(reeksen, MAAND_VOL, (v) => `${e.fmt(v)} ${e.eenheid}`, `${e.naam}verbruik per maand per jaar`)}</section>
   ${soort === 'gas' ? tempKaart(gekozen) : ''}
-  <section class="kaart" data-id="jaar"><div class="kaart-kop"><h2>Per jaar</h2></div>
+  ${totalen.length < 2 ? '' : `<section class="kaart" data-id="jaar"><div class="kaart-kop"><h2>Per jaar</h2></div>
     ${gestapeld(totalen.map((t) => ({ label: String(t.jaar), kort: `'${String(t.jaar).slice(2)}`, onvolledig: t.dagen < 365,
       delen: [{ naam: e.naam.toLowerCase(), waarde: t.som, kleur: e.kleur }] })), (v) => `${e.fmt(v)} ${e.eenheid}`, `${e.naam}verbruik per jaar`)}
-    ${totalen.some((t) => t.dagen < 365) ? '<p class="uitleg">Lichtere staven zijn onvolledige jaren.</p>' : ''}</section>
+    ${totalen.some((t) => t.dagen < 365) ? '<p class="uitleg">Lichtere staven zijn onvolledige jaren.</p>' : ''}</section>`}
   ${uk ?? (soort === 'stroom' ? '<section class="kaart" data-id="uur"><p class="uitleg">Laad je stroomexport met <b>kwartiertotalen</b> (opnieuw) in om je verbruik per uur te zien.</p></section>'
+    : soort === 'water' ? '<section class="kaart" data-id="uur"><p class="uitleg">Laad een waterexport <b>per uur</b> in om je verbruik per uur en de lekcontrole te zien.</p></section>'
     : '<section class="kaart" data-id="uur"><p class="uitleg">Laad een gasexport met <b>uurtotalen</b> in om je verbruik per uur te zien.</p></section>')}
   ${extra}`;
 }
@@ -491,7 +516,7 @@ async function bewaarInst(extra, veld) {
 }
 
 // ---------- weergave ----------
-const ROUTES = { '': overzicht, stroom: () => energieScherm('stroom'), gas: () => energieScherm('gas'), kosten: kostenScherm, import: importScherm };
+const ROUTES = { '': overzicht, stroom: () => energieScherm('stroom'), gas: () => energieScherm('gas'), water: () => energieScherm('water'), kosten: kostenScherm, import: importScherm };
 
 function render(boven = true) {
   const route = location.hash.replace(/^#\/?/, '');
@@ -508,9 +533,10 @@ function render(boven = true) {
 // Vaste indeling per scherm: elke rij bevat kaarten van dezelfde soort, zodat ze even hoog zijn.
 // Een rij is een lijst van vakken; een vak is één kaart of een lijst kaarten onder elkaar.
 const INDELING = {
-  '': [['contractstatus'], ['ringen', 'kosten12', 'prognose']],
+  '': [['lekalarm'], ['contractstatus'], ['ringen', 'kosten12', 'prognose']],
   stroom: [['jaren'], ['maand', 'jaar'], ['uur', 'dagprofiel'], ['piek', ['sluip', 'dagnacht']], ['drukste']],
   gas: [['jaren', 'jaar'], ['maand', 'temp'], ['uur', 'dagprofiel']],
+  water: [['jaren', 'jaar'], ['maand', 'lek'], ['uur', 'dagprofiel']],
   kosten: [['kmaand', 'kjaar'], ['split', 'prognose'], ['vastvar']],
   import: [['import', ['instellingen', 'plaats', 'account']]],
 };
@@ -640,7 +666,7 @@ document.addEventListener('change', async (e) => {
   if (e.target.id !== 'bestanden') return;
   state.melding = null;
   state.imports = await Promise.all([...e.target.files].map(async (f) => {
-    try { return { naam: f.name, ...parseFluvius(await f.text(), f.name) }; }
+    try { const t = await f.text(); return { naam: f.name, ...(isWater(t) ? parseWater(t) : parseFluvius(t, f.name)) }; }
     catch (err) { return { naam: f.name, fout: err.message }; }
   }));
   render(false);

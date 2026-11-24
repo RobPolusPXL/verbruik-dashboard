@@ -1,8 +1,8 @@
 // Eenvoudige service worker: app-bestanden cachen zodat de app snel opent en offline start.
 // Data komt uit Firestore (die heeft een eigen offline cache) en wordt hier niet gecachet.
-const CACHE = 'verbruik-v27';
+const CACHE = 'verbruik-v28';
 const BESTANDEN = ['./', 'index.html', 'css/app.css', 'js/app.js', 'js/store.js', 'js/fluvius.js', 'js/kosten.js',
-  'js/tarieven.js', 'js/indexen.js', 'js/charts.js', 'js/berekeningen.js', 'firebase-config.js', 'manifest.webmanifest', 'icons/icon.svg'];
+  'js/tarieven.js', 'js/indexen.js', 'js/charts.js', 'js/berekeningen.js', 'js/water.js', 'js/plaats.js', 'firebase-config.js', 'manifest.webmanifest', 'icons/icon.svg'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(BESTANDEN.map((b) => new Request(b, { cache: 'reload' })))).then(() => self.skipWaiting()));

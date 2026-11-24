@@ -56,26 +56,32 @@ export async function laadAlles(user) {
     docs = {};
     snap.forEach((d) => { docs[d.id] = d.data(); });
   }
-  const dagen = {}, uren = {}, suren = {}, pieken = {};
+  const dagen = {}, uren = {}, suren = {}, wuren = {}, pieken = {};
   for (const [ym, m] of Object.entries(docs)) {
     Object.assign(dagen, m.dagen || {});
     Object.assign(uren, m.uren || {});
     Object.assign(suren, m.suren || {});
+    Object.assign(wuren, m.wuren || {});
     if (m.piek != null) pieken[ym] = m.piek;
   }
-  return { dagen, uren, suren, pieken };
+  return { dagen, uren, suren, wuren, pieken };
 }
 
 // Geparste exports omzetten naar maanddocumenten.
 // bestaand = huidige data (voor de voorrang van dag- boven uurwaarden bij gas, en de hoogste maandpiek).
 export function bouwDocs(imports, bestaand) {
   const perMaand = {};
-  const M = (ym) => (perMaand[ym] ||= { dagen: {}, uren: {}, suren: {} });
+  const M = (ym) => (perMaand[ym] ||= { dagen: {}, uren: {}, suren: {}, wuren: {} });
   for (const imp of imports) {
     for (const [d, v] of Object.entries(imp.dagen)) {
       const doel = M(d.slice(0, 7)).dagen;
       if (imp.soort === 'stroom') {
         doel[d] = { ...(doel[d] || {}), sd: v.sd ?? 0, sn: v.sn ?? 0 };
+      } else if (imp.soort === 'water') {
+        // Dagexport gaat voor op de som van een uurexport.
+        const dagBron = imp.resolutie === 'dag';
+        const huidigeBron = doel[d]?.wbron ?? bestaand.dagen[d]?.wbron;
+        if (dagBron || huidigeBron !== 'dag') doel[d] = { ...(doel[d] || {}), wl: v.wl, wbron: dagBron ? 'dag' : 'uur' };
       } else {
         const dagBron = imp.resolutie === 'dag';
         const huidigeBron = doel[d]?.gbron ?? bestaand.dagen[d]?.gbron;
@@ -88,14 +94,15 @@ export function bouwDocs(imports, bestaand) {
     }
     for (const [d, a] of Object.entries(imp.uren)) M(d.slice(0, 7)).uren[d] = a;
     for (const [d, a] of Object.entries(imp.suren || {})) M(d.slice(0, 7)).suren[d] = a;
+    for (const [d, a] of Object.entries(imp.wuren || {})) M(d.slice(0, 7)).wuren[d] = a;
     // Een export die midden in een maand begint, mag een hogere piek van die maand niet overschrijven.
     for (const [ym, p] of Object.entries(imp.pieken)) M(ym).piek = Math.max(p, M(ym).piek ?? 0, bestaand.pieken[ym] ?? 0);
   }
   // Afronden om de documenten klein te houden
   const r3 = (x) => Math.round(x * 1000) / 1000;
   for (const m of Object.values(perMaand)) {
-    for (const v of Object.values(m.dagen)) for (const k of ['sd', 'sn', 'gm', 'gk']) if (v[k] != null) v[k] = r3(v[k]);
-    for (const k of ['uren', 'suren']) {
+    for (const v of Object.values(m.dagen)) for (const k of ['sd', 'sn', 'gm', 'gk', 'wl']) if (v[k] != null) v[k] = r3(v[k]);
+    for (const k of ['uren', 'suren', 'wuren']) {
       for (const d of Object.keys(m[k])) m[k][d] = m[k][d].map(r3);
       if (!Object.keys(m[k]).length) delete m[k];
     }
