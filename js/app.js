@@ -1,7 +1,7 @@
 import * as store from './store.js';
 import { parseFluvius } from './fluvius.js';
 import { kostenPerMaand, ontbreekt } from './kosten.js';
-import { MIN_PIEK, contracten, netVoor, gscVoor, zetEigen } from './tarieven.js';
+import { MIN_PIEK, contracten, netVoor } from './tarieven.js';
 import * as A from './berekeningen.js';
 import * as P from './plaats.js';
 import { esc, ring, gegroepeerd, gestapeld, lijnen, heatmap, dagprofiel } from './charts.js';
@@ -164,17 +164,17 @@ function contractStatusKaart() {
   const ditJaarMist = !(netVoor('stroom', nu.getFullYear()) && netVoor('gas', nu.getFullYear()));
   const items = st.map((x) => {
     const naam = x.soort === 'stroom' ? 'Stroom' : 'Gas';
-    if (!x.nu) return { t: `<b>${naam}: geen contract voor vandaag.</b> Vul je contract in bij Gegevens, anders worden er geen kosten berekend.`, toon: 'slecht' };
+    if (!x.nu) return { t: `<b>${naam}: geen contract voor vandaag.</b> Zonder contract worden er geen kosten berekend.`, toon: 'slecht' };
     const einde = `loopt tot <b>${datumJaar(x.nu.tot)}</b>`;
     if (x.opvolger) return { t: `${naam}: ${esc(x.nu.naam)} ${einde}, daarna ${esc(x.opvolger.naam)}.` };
-    if (x.toon) return { t: `<b>${naam}: je contract loopt af over ${x.rest} ${x.rest === 1 ? 'dag' : 'dagen'}</b> (${datumJaar(x.nu.tot)}). Vul je nieuwe contract in bij Gegevens, anders stopt de kostenberekening.`, toon: 'slecht' };
+    if (x.toon) return { t: `<b>${naam}: je contract loopt af over ${x.rest} ${x.rest === 1 ? 'dag' : 'dagen'}</b> (${datumJaar(x.nu.tot)}). Zonder nieuw contract stopt de kostenberekening.`, toon: 'slecht' };
     return { t: `${naam}: ${esc(x.nu.naam)} ${einde} (nog ${x.rest} dagen).` };
   });
-  if (ditJaarMist) items.push({ t: `<b>De nettarieven van ${nu.getFullYear()} zijn nog niet ingevuld.</b> Vul ze in bij Gegevens.`, toon: 'slecht' });
-  else if (tariefMist) items.push({ t: `<b>Vul de nettarieven van ${volgendJaar} in</b> bij Gegevens zodra je ze hebt. Vanaf 1 januari zijn ze nodig.`, toon: 'slecht' });
+  if (ditJaarMist) items.push({ t: `<b>De nettarieven van ${nu.getFullYear()} zijn nog niet ingevuld.</b> Zonder die tarieven worden er geen kosten berekend.`, toon: 'slecht' });
+  else if (tariefMist) items.push({ t: `<b>De nettarieven van ${volgendJaar} ontbreken nog.</b> Vanaf 1 januari zijn ze nodig.`, toon: 'slecht' });
   const dringend = items.some((i) => i.toon === 'slecht');
-  return `<a class="kaart${dringend ? ' let-op' : ''}" data-id="contractstatus" href="#/import">
-    <div class="kaart-kop"><h2>${dringend ? 'Actie nodig' : 'Contracten'}</h2></div>${conclusies(items)}</a>`;
+  return `<section class="kaart${dringend ? ' let-op' : ''}" data-id="contractstatus">
+    <div class="kaart-kop"><h2>${dringend ? 'Actie nodig' : 'Contracten'}</h2></div>${conclusies(items)}</section>`;
 }
 
 function ringBlok(naam, y, eenheid, kleur) {
@@ -392,13 +392,13 @@ function kostenScherm() {
       delen: [{ naam: 'stroom', waarde: kk.stroom, kleur: KLEUR.stroom }, { naam: 'gas', waarde: kk.gas, kleur: KLEUR.gas }] };
   });
   // Maanden zonder kosten: waarom niet?
-  const REDEN = { index: 'de beursindex van die maand is nog niet gepubliceerd', contract: 'er is geen contract ingevuld voor die periode', tarieven: 'de nettarieven van dat jaar zijn nog niet ingevuld' };
+  const REDEN = { index: 'de beursindex van die maand is nog niet gepubliceerd', contract: 'er is geen contract voor die periode', tarieven: 'de nettarieven van dat jaar ontbreken' };
   const ontbrekend = [];
   for (const m of selectie) for (const soort of ['stroom', 'gas']) {
     if (m[soort]) continue;
     const r = Object.keys(dagen).filter((x) => x.startsWith(m.maand) && (soort === 'stroom' ? A.stroomKwh(dagen[x]) : dagen[x].gk) != null)
       .sort().map((x) => ontbreekt(soort, x)).find(Boolean);
-    if (r) ontbrekend.push(`${soort === 'stroom' ? 'Stroom' : 'Gas'} van ${maandLang(m.maand)}: ${REDEN[r]}${r === 'index' ? '' : ' (zie Gegevens)'}.`);
+    if (r) ontbrekend.push(`${soort === 'stroom' ? 'Stroom' : 'Gas'} van ${maandLang(m.maand)}: ${REDEN[r]}.`);
   }
   const titel = keuze === 'laatste' ? `Laatste ${selectie.length} maanden` : `${keuze}${selectie.length < 12 ? ` (${selectie.length} maanden)` : ''}`;
   const p = A.prognose(state.data, state.instellingen);
@@ -470,8 +470,6 @@ function importScherm() {
     ${state.instMelding ? `<p class="melding">${esc(state.instMelding)}</p>` : ''}
   </form>
   ${plaatsKaart()}
-  ${contractKaart()}
-  ${tariefKaart()}
   <section class="kaart" data-id="account">
     <h2>Account</h2>
     <p class="uitleg">Aangemeld als ${esc(state.user.email || state.user.displayName || '')}. ${Object.keys(state.data.dagen).length} dagen opgeslagen.</p>
@@ -479,74 +477,11 @@ function importScherm() {
   </section>`;
 }
 
-function contractKaart() {
-  const rij = (c, soort) => `<li><b>${esc(c.naam)}</b> <small>${soort}</small><br>${datumJaar(c.van)} – ${datumJaar(c.tot)} · ${c.vast ? `vast ${esc(c.formule ?? `${f2(c.prijs())} c€/kWh incl. btw`)}` : esc(c.formule ?? 'variabel, formule van de tariefkaart')}
-    ${c.eigen ? `<button type="button" class="link" data-actie="contract-weg" data-waarde="${esc(c.id)}">Verwijderen</button>` : ''}</li>`;
-  const lijst = ['stroom', 'gas'].flatMap((s) => contracten(s).map((c) => ({ c, s }))).sort((a, b) => (a.c.van < b.c.van ? 1 : -1));
-  return `<form class="kaart" data-id="contracten" id="contractform">
-    <h2>Contracten</h2>
-    <p class="uitleg">Zonder contract voor een periode berekent de app voor die periode geen kosten. Vul een nieuw contract in zodra je het hebt, met de cijfers van je tariefkaart.</p>
-    <ul class="importlijst">${lijst.map(({ c, s }) => rij(c, s)).join('')}</ul>
-    <h3 class="tussenkop">Nieuw contract</h3>
-    <div class="velden2">
-      <label class="veld"><span>Energie</span><select name="soort"><option value="stroom">Stroom</option><option value="gas">Gas</option></select></label>
-      <label class="veld"><span>Soort prijs</span><select name="vast"><option value="0">Variabel</option><option value="1">Vast</option></select></label>
-    </div>
-    <label class="veld"><span>Naam (zoals op de tariefkaart)</span><input name="naam" required></label>
-    <div class="velden2">
-      <label class="veld"><span>Van</span><input name="van" type="date" required></label>
-      <label class="veld"><span>Tot en met</span><input name="tot" type="date" required></label>
-    </div>
-    <p class="uitleg">Variabel: de formule van je tariefkaart, <b>factor × index + constante</b>, in c€/kWh excl. btw. Vast: de prijs in c€/kWh incl. btw.</p>
-    <div class="velden2">
-      <label class="veld"><span>Factor (variabel)</span><input name="factor" type="number" step="any" inputmode="decimal"></label>
-      <label class="veld"><span>Constante (variabel)</span><input name="constante" type="number" step="any" inputmode="decimal"></label>
-    </div>
-    <div class="velden2">
-      <label class="veld"><span>Prijs (vast)</span><input name="prijs" type="number" step="any" inputmode="decimal"></label>
-      <label class="veld"><span>Vaste vergoeding (€/jaar incl. btw)</span><input name="vergoeding" type="number" step="any" inputmode="decimal" value="35"></label>
-    </div>
-    <button type="submit" class="knop">Contract toevoegen</button>
-    ${state.contractMelding ? `<p class="melding">${esc(state.contractMelding)}</p>` : ''}
-  </form>`;
-}
-
-function tariefKaart() {
-  const nu = new Date().getFullYear();
-  const jaren = [...new Set([nu - 1, nu, nu + 1])].sort();
-  const status = jaren.map((j) => {
-    const ok = netVoor('stroom', j) && gscVoor(j) != null && netVoor('gas', j);
-    return `<li><b>${j}</b>: ${ok ? 'ingevuld' : '<span class="slecht">nog niet ingevuld, kosten van dat jaar worden niet berekend</span>'}</li>`;
-  }).join('');
-  return `<form class="kaart" data-id="tarieven" id="tariefform">
-    <h2>Nettarieven per jaar</h2>
-    <p class="uitleg">Fluvius past de nettarieven elk jaar op 1 januari aan. Je vindt ze op de tariefkaart van je leverancier, onder nettarieven Fluvius Limburg. Alles incl. btw.</p>
-    <ul class="importlijst">${status}</ul>
-    <label class="veld"><span>Jaar</span><input name="jaar" type="number" min="2025" max="2100" value="${nu + 1}" required></label>
-    <h3 class="tussenkop">Stroom</h3>
-    <div class="velden2">
-      <label class="veld"><span>Afname (c€/kWh)</span><input name="s_afname" type="number" step="any" required></label>
-      <label class="veld"><span>Capaciteitstarief (€/kW/jaar)</span><input name="s_capaciteit" type="number" step="any" required></label>
-      <label class="veld"><span>Databeheer (€/jaar)</span><input name="s_databeheer" type="number" step="any" required></label>
-      <label class="veld"><span>Groene stroom + WKK (c€/kWh)</span><input name="s_gsc" type="number" step="any" required></label>
-    </div>
-    <h3 class="tussenkop">Gas</h3>
-    <div class="velden2">
-      <label class="veld"><span>Distributie (c€/kWh)</span><input name="g_distributie" type="number" step="any" required></label>
-      <label class="veld"><span>Transport (c€/kWh)</span><input name="g_transport" type="number" step="any" required></label>
-      <label class="veld"><span>Vaste term (€/jaar)</span><input name="g_vast" type="number" step="any" required></label>
-      <label class="veld"><span>Databeheer (€/jaar)</span><input name="g_databeheer" type="number" step="any" required></label>
-    </div>
-    <button type="submit" class="knop">Tarieven bewaren</button>
-    ${state.tariefMelding ? `<p class="melding">${esc(state.tariefMelding)}</p>` : ''}
-  </form>`;
-}
-
 async function bewaarInst(extra, veld) {
   const nieuw = { ...state.instellingen, ...extra };
   try {
     await store.bewaarInstellingen(state.user, nieuw);
-    state.instellingen = nieuw; zetEigen(nieuw); state[veld] = 'Bewaard.';
+    state.instellingen = nieuw; state[veld] = 'Bewaard.';
   } catch (err) { state[veld] = 'Bewaren mislukt: ' + err.message; }
   render(false);
 }
@@ -573,7 +508,7 @@ const INDELING = {
   stroom: [['jaren'], ['maand', 'jaar'], ['uur', 'dagprofiel'], ['piek', ['sluip', 'dagnacht']], ['drukste']],
   gas: [['jaren', 'jaar'], ['maand', 'temp'], ['uur', 'dagprofiel']],
   kosten: [['kmaand', 'kjaar'], ['split', 'prognose'], ['vastvar']],
-  import: [['import', ['instellingen', 'plaats', 'account']], ['contracten', 'tarieven']],
+  import: [['import', ['instellingen', 'plaats', 'account']]],
 };
 const COMPUTER = matchMedia('(min-width: 1100px)');
 function indelen(route) {
@@ -618,7 +553,7 @@ function loginScherm() {
 async function laad() {
   state.data = null; render();
   const [data, inst] = await Promise.all([store.laadAlles(state.user), store.laadInstellingen(state.user).catch(() => ({}))]);
-  state.data = data; state.instellingen = inst; zetEigen(inst); state.temp = null; state.tempFout = null;
+  state.data = data; state.instellingen = inst; state.temp = null; state.tempFout = null;
   render();
 }
 
@@ -652,8 +587,6 @@ document.addEventListener('click', async (e) => {
     state.plaatsKeuzes = [];
     state.temp = null; state.tempFout = null;
     await bewaarInst({ plaats: { naam: k.naam, postcode: k.postcode, provincie: k.provincie, lat: k.lat, lon: k.lon } }, 'plaatsMelding');
-  } else if (actie === 'contract-weg') {
-    await bewaarInst({ contracten: (state.instellingen.contracten || []).filter((c) => c.id !== waarde) }, 'contractMelding');
   } else if (actie === 'kosten-jaar') {
     state.ui.kostenJaar = waarde; render(false);
   } else if (actie === 'uur-vorige') {
@@ -665,7 +598,7 @@ document.addEventListener('click', async (e) => {
 
 document.addEventListener('submit', async (e) => {
   const id = e.target.id;
-  if (!['instellingen', 'contractform', 'tariefform', 'plaatsform'].includes(id)) return;
+  if (!['instellingen', 'plaatsform'].includes(id)) return;
   e.preventDefault();
   const fd = Object.fromEntries(new FormData(e.target).entries());
   const getal = (k) => (fd[k] === '' || fd[k] == null ? null : parseFloat(fd[k]));
@@ -684,23 +617,6 @@ document.addEventListener('submit', async (e) => {
     const data = { voorschot: null, startMaand: 4, vasteStroomprijs: null, vasteGasprijs: null };
     for (const k of Object.keys(data)) data[k] = k === 'startMaand' ? +fd[k] : getal(k);
     await bewaarInst(data, 'instMelding');
-  } else if (id === 'contractform') {
-    const vast = fd.vast === '1';
-    const c = { id: String(Date.now()), soort: fd.soort, naam: fd.naam.trim(), van: fd.van, tot: fd.tot, vast,
-      factor: getal('factor'), constante: getal('constante'), prijs: getal('prijs'), vergoeding: getal('vergoeding') ?? 35 };
-    if (c.tot < c.van) { state.contractMelding = 'De einddatum ligt voor de begindatum.'; render(false); return; }
-    if (vast ? c.prijs == null : c.factor == null || c.constante == null) {
-      state.contractMelding = vast ? 'Vul de vaste prijs in.' : 'Vul de factor en de constante van de formule in.'; render(false); return;
-    }
-    await bewaarInst({ contracten: [...(state.instellingen.contracten || []), c] }, 'contractMelding');
-  } else {
-    const j = String(parseInt(fd.jaar, 10));
-    const net = { ...(state.instellingen.net || {}) };
-    net[j] = {
-      stroom: { afname: getal('s_afname'), capaciteit: getal('s_capaciteit'), databeheer: getal('s_databeheer'), gsc: getal('s_gsc') },
-      gas: { distributie: getal('g_distributie'), transport: getal('g_transport'), vast: getal('g_vast'), databeheer: getal('g_databeheer') },
-    };
-    await bewaarInst({ net }, 'tariefMelding');
   }
 });
 

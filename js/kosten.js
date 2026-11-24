@@ -86,7 +86,7 @@ export function kostenPerMaand(dagen, pieken, { schatting = false } = {}) {
         M.stroom.energie += c.prijs(idx) * kwh / 100;
         M.stroom.net += net.afname * kwh / 100 + (net.capaciteit * rollendePiek(pieken, ym) + net.databeheer) / 365;
         M.stroom.heffingen += (gsc + geldend(HEFFINGEN.stroom, d)) * kwh / 100;
-        M.stroom.vast += (c.vergoeding ?? VASTE_VERGOEDING) / 365;
+        M.stroom.vast += VASTE_VERGOEDING / 365;
         M.stroom.dagen += 1;
       }
     }
@@ -102,7 +102,7 @@ export function kostenPerMaand(dagen, pieken, { schatting = false } = {}) {
         M.gas.energie += c.prijs(idx) * v.gk / 100;
         M.gas.net += (net.distributie + net.transport) * v.gk / 100 + (net.vast + net.databeheer) / 365;
         M.gas.heffingen += geldend(HEFFINGEN.gas, d) * v.gk / 100;
-        M.gas.vast += (c.vergoeding ?? VASTE_VERGOEDING) / 365;
+        M.gas.vast += VASTE_VERGOEDING / 365;
         M.gas.dagen += 1;
       }
     }
