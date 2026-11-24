@@ -189,3 +189,4 @@ body > main > .chips { margin: 0 2px 4px; }
 .link { font: inherit; font-size: 12px; color: var(--slecht); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; }
 .importlijst small { color: var(--mute); }
 span.slecht { color: var(--slecht); }
+.kaart.let-op { border-color: rgba(242, 166, 90, .55); }

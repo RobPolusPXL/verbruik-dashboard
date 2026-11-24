@@ -123,6 +123,8 @@ function overzicht() {
       <div class="tw">${f2(pieken[ymNu])}<small>kW</small></div><div class="td">${maandLang(ymNu)}</div></a>` : ''}
   </div>
 
+  ${contractStatusKaart()}
+
   ${s || g ? `<section class="kaart" data-id="ringen">
     <div class="kaart-kop"><h2>Dit jaar tegen vorig jaar</h2><span>t.e.m. ${datumKort((g || s).laatste)}</span></div>
     <div class="ringen">${g ? ringBlok('Gas', g, 'm³', KLEUR.gas) : ''}${s ? ringBlok('Stroom', s, 'kWh', KLEUR.stroom) : ''}</div>
@@ -134,6 +136,44 @@ function overzicht() {
   </a>` : ''}
 
   ${p ? prognoseKaart(p, true) : ''}`;
+}
+
+// Lopende contracten en wanneer ze aflopen. Waarschuwt 60 dagen op voorhand als er nog geen opvolger is,
+// en als de nettarieven van volgend jaar in december nog niet ingevuld zijn.
+const WAARSCHUW_DAGEN = 60;
+function contractStatus() {
+  const vandaag = new Date().toISOString().slice(0, 10);
+  const dagenTot = (d) => Math.round((Date.parse(d) - Date.parse(vandaag)) / 864e5);
+  const plus1 = (d) => new Date(Date.parse(d) + 864e5).toISOString().slice(0, 10);
+  return ['stroom', 'gas'].map((soort) => {
+    const lijst = contracten(soort);
+    const nu = lijst.find((c) => vandaag >= c.van && vandaag <= c.tot);
+    if (!nu) return { soort, nu: null, toon: 'slecht' };
+    const opvolger = lijst.find((c) => c.van === plus1(nu.tot) || (c.van > nu.van && c.van <= plus1(nu.tot) && c.tot > nu.tot));
+    const rest = dagenTot(nu.tot);
+    return { soort, nu, rest, opvolger, toon: !opvolger && rest <= WAARSCHUW_DAGEN ? 'slecht' : undefined };
+  });
+}
+
+function contractStatusKaart() {
+  const st = contractStatus();
+  const nu = new Date();
+  const volgendJaar = nu.getFullYear() + 1;
+  const tariefMist = nu.getMonth() === 11 && !(netVoor('stroom', volgendJaar) && netVoor('gas', volgendJaar));
+  const ditJaarMist = !(netVoor('stroom', nu.getFullYear()) && netVoor('gas', nu.getFullYear()));
+  const items = st.map((x) => {
+    const naam = x.soort === 'stroom' ? 'Stroom' : 'Gas';
+    if (!x.nu) return { t: `<b>${naam}: geen contract voor vandaag.</b> Vul je contract in bij Gegevens, anders worden er geen kosten berekend.`, toon: 'slecht' };
+    const einde = `loopt tot <b>${datumJaar(x.nu.tot)}</b>`;
+    if (x.opvolger) return { t: `${naam}: ${esc(x.nu.naam)} ${einde}, daarna ${esc(x.opvolger.naam)}.` };
+    if (x.toon) return { t: `<b>${naam}: je contract loopt af over ${x.rest} ${x.rest === 1 ? 'dag' : 'dagen'}</b> (${datumJaar(x.nu.tot)}). Vul je nieuwe contract in bij Gegevens, anders stopt de kostenberekening.`, toon: 'slecht' };
+    return { t: `${naam}: ${esc(x.nu.naam)} ${einde} (nog ${x.rest} dagen).` };
+  });
+  if (ditJaarMist) items.push({ t: `<b>De nettarieven van ${nu.getFullYear()} zijn nog niet ingevuld.</b> Vul ze in bij Gegevens.`, toon: 'slecht' });
+  else if (tariefMist) items.push({ t: `<b>Vul de nettarieven van ${volgendJaar} in</b> bij Gegevens zodra je ze hebt. Vanaf 1 januari zijn ze nodig.`, toon: 'slecht' });
+  const dringend = items.some((i) => i.toon === 'slecht');
+  return `<a class="kaart${dringend ? ' let-op' : ''}" data-id="contractstatus" href="#/import">
+    <div class="kaart-kop"><h2>${dringend ? 'Actie nodig' : 'Contracten'}</h2></div>${conclusies(items)}</a>`;
 }
 
 function ringBlok(naam, y, eenheid, kleur) {
@@ -461,7 +501,7 @@ function render(boven = true) {
 // Vaste indeling per scherm: elke rij bevat kaarten van dezelfde soort, zodat ze even hoog zijn.
 // Een rij is een lijst van vakken; een vak is één kaart of een lijst kaarten onder elkaar.
 const INDELING = {
-  '': [['ringen', 'kosten12', 'prognose']],
+  '': [['contractstatus'], ['ringen', 'kosten12', 'prognose']],
   stroom: [['jaren'], ['maand', 'jaar'], ['uur', 'dagprofiel'], ['piek', ['sluip', 'dagnacht']], ['drukste']],
   gas: [['jaren'], ['maand', 'jaar'], ['uur', 'dagprofiel']],
   kosten: [['kmaand', 'kjaar'], ['split', 'prognose'], ['vastvar']],
