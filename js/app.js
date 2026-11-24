@@ -425,8 +425,29 @@ function render(boven = true) {
   if (!state.data) { $view.innerHTML = '<div class="laden">Laden…</div>'; return; }
   const y = scrollY;
   $view.innerHTML = (ROUTES[route] || overzicht)();
+  indelen();
   if (boven) scrollTo(0, 0); else scrollTo(0, y);
 }
+
+// Computer: kaarten in twee vaste kolommen. Links het verloop over tijd, rechts patronen en details.
+const RECHTS = ['Per uur', 'Sluipverbruik', 'Drukste dagen', 'Dag en nacht', 'Gas per graaddag', 'Kosten, laatste',
+  'Verwachte jaarafrekening', 'Vast of variabel?', 'Instellingen', 'Account'];
+const DESKTOP = matchMedia('(min-width: 1000px)');
+function indelen() {
+  if (!DESKTOP.matches) return;
+  const kaarten = [...$view.children].filter((el) => el.classList.contains('kaart') && !el.classList.contains('kern'));
+  if (kaarten.length < 2) return;
+  const rechts = (k) => RECHTS.some((t) => (k.querySelector('h2')?.textContent || '').trim().startsWith(t));
+  const wrap = document.createElement('div'); wrap.className = 'kolommen';
+  const l = document.createElement('div'), r = document.createElement('div');
+  l.className = r.className = 'kol';
+  $view.insertBefore(wrap, kaarten[0]);
+  kaarten.forEach((k) => (rechts(k) ? r : l).appendChild(k));
+  if (!r.children.length) { const helft = Math.ceil(l.children.length / 2); [...l.children].slice(helft).forEach((k) => r.appendChild(k)); }
+  if (!l.children.length) { const helft = Math.ceil(r.children.length / 2); [...r.children].slice(0, helft).forEach((k) => l.appendChild(k)); }
+  wrap.append(l, r);
+}
+DESKTOP.addEventListener('change', () => render(false));
 
 function loginScherm() {
   if (state.fout === 'config') return '<section class="leeg"><h2>Firebase is nog niet ingesteld</h2><p>Vul <code>firebase-config.js</code> in (zie README).</p></section>';

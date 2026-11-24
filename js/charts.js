@@ -18,8 +18,11 @@ export function ring(frac, kleur, label, groot, klein) {
 
 // Gegroepeerde staven: 12 maanden, één staaf per jaar.
 // reeksen: [{ naam, kleur, waarden: [12] }], fmt: getal → tekst
+// Op een computer zijn de kaarten breder: grafieken dan breder en lager tekenen, zodat ze niet opgeblazen worden.
+const breedte = () => (globalThis.matchMedia?.('(min-width: 1000px)').matches ? 560 : 350);
+
 export function gegroepeerd(reeksen, maandLabels, fmt, label) {
-  const W = 350, H = 170, onder = 18, boven = 6;
+  const W = breedte(), H = 170, onder = 18, boven = 6;
   const max = Math.max(1e-6, ...reeksen.flatMap((r) => r.waarden.filter((v) => v != null)));
   const groep = W / 12, binnen = groep * 0.78, sw = binnen / reeksen.length;
   let s = '';
@@ -53,7 +56,7 @@ function kolommen(n, breed, H, tekst, x0 = 0) {
 // Gestapelde staven: [{ label, kort, delen: [{ waarde, kleur, naam }] }]
 export function gestapeld(kolommen_, fmt, label) {
   const kolommenLijst = kolommen_;
-  const W = 350, H = 170, onder = 18, boven = 6;
+  const W = breedte(), H = 170, onder = 18, boven = 6;
   const max = Math.max(1, ...kolommenLijst.map((k) => k.delen.reduce((a, d) => a + (d.waarde || 0), 0)));
   const breed = W / kolommenLijst.length, bw = breed * 0.72;
   const stap = Math.ceil(kolommenLijst.length / 10);
@@ -83,7 +86,7 @@ export function gestapeld(kolommen_, fmt, label) {
 
 // Lijnen per jaar over 12 maanden.
 export function lijnen(reeksen, maandLabels, fmt, label) {
-  const W = 350, H = 150, onder = 18, boven = 8;
+  const W = breedte(), H = 150, onder = 18, boven = 8;
   const alle = reeksen.flatMap((r) => r.waarden.filter((v) => v != null));
   const max = Math.max(1, ...alle) * 1.08;
   const x = (m) => 10 + m * ((W - 20) / 11);
@@ -117,7 +120,7 @@ export function heatmap(rijen, kleurRgb, fmt, label) {
 
 // Gemiddelde dag: 24 uurwaarden als lijn met vlak eronder.
 export function dagprofiel(waarden, kleur, fmt, label) {
-  const W = 350, H = 120, onder = 18, boven = 8;
+  const W = breedte(), H = 120, onder = 18, boven = 8;
   const max = Math.max(0.0001, ...waarden) * 1.1;
   const x = (u) => 8 + u * ((W - 16) / 23);
   const y = (v) => H - onder - (v / max) * (H - onder - boven);

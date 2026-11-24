@@ -157,20 +157,17 @@ body > main > .chips { margin: 0 2px 4px; }
   nav a.actief { background: rgba(255,255,255,.07); color: #fff; }
   nav svg { width: 20px; height: 20px; }
 
-  main { max-width: 1800px; margin: 0 0 0 220px; padding: 36px 40px 48px;
-    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start; grid-auto-flow: row dense; }
-  main > .kaart.uur { grid-row: span 2; }
-  main > * { margin: 0; min-width: 0; }
-  main > .kop, main > .kop-getal, main > .chips, main > .tegels, main > .leeg, main > .los,
-  main > .laden, main > .kern { grid-column: 1 / -1; }
+  main { max-width: 1400px; margin: 0 0 0 220px; padding: 36px 48px 56px; gap: 20px; }
+  .kolommen { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start; }
+  .kol { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
   main > .kop h1 { font-size: 34px; }
   main > .tegels { grid-template-columns: repeat(3, minmax(0, 260px)); }
   .terug { display: none; }
   .kop.rij { gap: 0; }
   .kaart:hover { border-color: #2C3240; }
 }
-@media (min-width: 1650px) {
-  main { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (min-width: 1700px) {
+  main { margin-left: calc(220px + (100vw - 220px - 1400px) / 2); }
 }
 @media (min-width: 1000px) and (min-height: 600px) {
   nav a[href="#/import"] { margin-top: auto; }
