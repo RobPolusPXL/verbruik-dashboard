@@ -59,7 +59,29 @@ export const HEFFINGEN = {
 // Minimum voor het capaciteitstarief (kW).
 export const MIN_PIEK = 2.5;
 
-// ---------- Opzoeken ----------
-export const contracten = (soort) => CONTRACTEN[soort];
-export const netVoor = (soort, jaar) => NET[soort][jaar] ?? null;
-export const gscVoor = (jaar) => GSC_WKK[jaar] ?? null;
+// ---------- Per account ----------
+// Contracten, nettarieven en groene stroom/WKK zijn persoonlijk: ze horen bij één account.
+// Een account zonder profiel krijgt geen contracten en dus geen kostenberekening, alleen verbruik.
+// Sleutel = SHA-256 van het e-mailadres (zodat het adres niet in de code staat).
+const PROFIELEN = {
+  a7a9e419654b2beba40fe08bee63558e7916a76e0c279bd47bdba0f2ba60615d: { contracten: CONTRACTEN, net: NET, gsc: GSC_WKK },
+};
+const LEEG = { contracten: { stroom: [], gas: [] }, net: { stroom: {}, gas: {} }, gsc: {} };
+let profiel = LEEG;
+
+export async function kiesProfiel(email, demo = false) {
+  if (demo) { profiel = Object.values(PROFIELEN)[0]; return true; }
+  profiel = LEEG;
+  if (!email || !globalThis.crypto?.subtle) return false;
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(email.trim().toLowerCase()));
+  const hash = [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  profiel = PROFIELEN[hash] || LEEG;
+  return profiel !== LEEG;
+}
+
+export const heeftProfiel = () => profiel !== LEEG;
+export const contracten = (soort) => profiel.contracten[soort];
+export const netVoor = (soort, jaar) => profiel.net[soort][jaar] ?? null;
+export const gscVoor = (jaar) => profiel.gsc[jaar] ?? null;
+export const netTabel = (soort) => profiel.net[soort];
+export const gscTabel = () => profiel.gsc;

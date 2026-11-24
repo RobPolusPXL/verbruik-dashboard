@@ -1,7 +1,7 @@
 import * as store from './store.js';
 import { parseFluvius } from './fluvius.js';
 import { kostenPerMaand, ontbreekt } from './kosten.js';
-import { MIN_PIEK, contracten, netVoor } from './tarieven.js';
+import { MIN_PIEK, contracten, netVoor, kiesProfiel, heeftProfiel } from './tarieven.js';
 import * as A from './berekeningen.js';
 import * as P from './plaats.js';
 import { esc, ring, gegroepeerd, gestapeld, lijnen, heatmap, dagprofiel } from './charts.js';
@@ -111,7 +111,7 @@ function overzicht() {
   const kosten = kostenPerMaand(dagen, pieken);
   const l12 = laatste12(kosten);
   const k = l12.length ? kostenVan(l12) : null;
-  const p = A.prognose(state.data, state.instellingen);
+  const p = heeftProfiel() ? A.prognose(state.data, state.instellingen) : null;
 
   return `
   <header class="kop"><div class="sub">${DAG[nu.getDay()]} ${nu.getDate()} ${MND[nu.getMonth()]}</div><h1>Thuis</h1></header>
@@ -157,6 +157,7 @@ function contractStatus() {
 }
 
 function contractStatusKaart() {
+  if (!heeftProfiel()) return '';
   const st = contractStatus();
   const nu = new Date();
   const volgendJaar = nu.getFullYear() + 1;
@@ -376,6 +377,8 @@ function energieScherm(soort) {
 function kostenScherm() {
   const { dagen, pieken } = state.data;
   const kosten = kostenPerMaand(dagen, pieken);
+  if (!heeftProfiel()) return `${detailKop('Kosten')}<section class="leeg"><h2>Geen kosten voor dit account</h2>
+    <p>Voor dit account zijn geen contracten ingesteld. De app toont daarom alleen je verbruik. Kosten worden nooit berekend met de prijzen van iemand anders.</p></section>`;
   if (!kosten.length) return detailKop('Kosten') + leegScherm();
   const jaren = [...new Set(kosten.map((k) => k.maand.slice(0, 4)))];
   const keuze = state.ui.kostenJaar;
@@ -402,7 +405,7 @@ function kostenScherm() {
     if (r) ontbrekend.push(`${soort === 'stroom' ? 'Stroom' : 'Gas'} van ${maandLang(m.maand)}: ${REDEN[r]}.`);
   }
   const titel = keuze === 'laatste' ? `Laatste ${selectie.length} maanden` : `${keuze}${selectie.length < 12 ? ` (${selectie.length} maanden)` : ''}`;
-  const p = A.prognose(state.data, state.instellingen);
+  const p = heeftProfiel() ? A.prognose(state.data, state.instellingen) : null;
 
   return `${detailKop('Kosten')}
   ${chips([{ waarde: 'laatste', label: '12 maanden' }, ...jaren.map((j) => ({ waarde: j, label: j }))], (w) => w === keuze, 'kosten-jaar', 'Periode')}
@@ -664,9 +667,9 @@ document.addEventListener('scroll', () => { tip.hidden = true; actief?.classList
 
 window.addEventListener('hashchange', () => render());
 
-store.init((u) => {
+store.init(async (u) => {
   state.user = u; state.gestart = true;
-  if (u) laad(); else { state.data = null; render(); }
+  if (u) { await kiesProfiel(u.email, !!u.demo); laad(); } else { await kiesProfiel(null); state.data = null; render(); }
 }).catch((err) => { state.fout = err.message === 'config' ? 'config' : err.message; render(); });
 
 render();

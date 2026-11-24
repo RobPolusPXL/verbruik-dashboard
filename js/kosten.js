@@ -1,6 +1,6 @@
 import { BELPEX_RLP, TTF_RLP } from './indexen.js';
 import {
-  START, VASTE_VERGOEDING, NET, GSC_WKK, HEFFINGEN, MIN_PIEK, contracten, netVoor, gscVoor,
+  START, VASTE_VERGOEDING, HEFFINGEN, MIN_PIEK, contracten, netVoor, gscVoor, netTabel, gscTabel,
 } from './tarieven.js';
 
 export function contractOp(soort, datum, schatting = false) {
@@ -31,15 +31,17 @@ function netVan(soort, datum, schatting) {
   const j = +datum.slice(0, 4);
   const t = netVoor(soort, j);
   if (t || !schatting) return t;
-  const jaren = Object.keys(NET[soort]).map(Number).filter((x) => x < j);
-  return jaren.length ? NET[soort][Math.max(...jaren)] : null;
+  const T = netTabel(soort);
+  const jaren = Object.keys(T).map(Number).filter((x) => x < j);
+  return jaren.length ? T[Math.max(...jaren)] : null;
 }
 function gscVan(datum, schatting) {
   const j = +datum.slice(0, 4);
   const w = gscVoor(j);
   if (w != null || !schatting) return w;
-  const jaren = Object.keys(GSC_WKK).map(Number).filter((x) => x < j);
-  return jaren.length ? GSC_WKK[Math.max(...jaren)] : null;
+  const G = gscTabel();
+  const jaren = Object.keys(G).map(Number).filter((x) => x < j);
+  return jaren.length ? G[Math.max(...jaren)] : null;
 }
 
 // Waarom een dag niet berekend kan worden (of null als het wel kan).
