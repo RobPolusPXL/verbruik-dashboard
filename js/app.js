@@ -421,7 +421,7 @@ function kostenScherm() {
     <p class="uitleg">Lichtere staven zijn onvolledige jaren. De kosten worden berekend vanaf april 2025.</p></section>
   ${p ? prognoseKaart(p, false) : `<section class="kaart" data-id="prognose"><h2>Verwachte jaarafrekening</h2><p class="uitleg">Vul je maandelijkse voorschot in bij <a href="#/import"><b>Gegevens</b></a> om te zien of je geld terugkrijgt of moet bijbetalen.</p></section>`}
   ${vastVariabelKaart(kosten)}
-  <p class="uitleg los"><b>Werkt alleen voor Energie.be:</b> de contracten en nettarieven in de app zijn die van Energie.be (nettarieven Fluvius Limburg). Berekend per dag met de tariefkaart van je contract, de gepubliceerde beursindex van de maand en de nettarieven van Fluvius Limburg. April 2025 – maart 2026 is gecontroleerd met je jaarafrekening.</p>`;
+  <p class="uitleg los"><b>Contractprijzen:</b> alleen voor Energie.be. <b>Nettarieven:</b> Fluvius Limburg, geldig voor iedereen in die regio. <b>Verbruik:</b> uit je Fluvius-export, voor elke leverancier. Berekend per dag met de tariefkaart van je contract, de gepubliceerde beursindex van de maand en de nettarieven van Fluvius Limburg. April 2025 – maart 2026 is gecontroleerd met je jaarafrekening.</p>`;
 }
 
 function vastVariabelKaart(kosten) {
