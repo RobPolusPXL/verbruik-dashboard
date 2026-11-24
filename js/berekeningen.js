@@ -1,6 +1,6 @@
 // Afgeleide cijfers: totalen, vergelijkingen, prognose, sluipverbruik en conclusies.
 import { kostenPerMaand, contractOp, indexVan } from './kosten.js';
-import { CONTRACTEN } from './tarieven.js';
+import { contracten } from './tarieven.js';
 import { TTF_RLP } from './indexen.js';
 
 export const stroomKwh = (v) => (v.sd != null || v.sn != null ? (v.sd ?? 0) + (v.sn ?? 0) : null);
@@ -122,8 +122,8 @@ function vergelijkGasEnergie(dagen, van, tot, prijsAlt) {
 
 // Gas: je vaste contract tegen het laatste variabele contract met de TTF-index van elke maand.
 export function gasVastTegenVariabel(dagen) {
-  const vast = CONTRACTEN.gas.find((c) => c.vast);
-  const variabel = [...CONTRACTEN.gas].reverse().find((c) => !c.vast);
+  const vast = contracten('gas').find((c) => c.vast);
+  const variabel = contracten('gas').filter((c) => !c.vast).sort((a, b) => (a.tot < b.tot ? -1 : 1)).at(-1);
   if (!vast || !variabel) return null;
   const r = vergelijkGasEnergie(dagen, vast.van, vast.tot, (d) => {
     const i = indexVan(TTF_RLP, d.slice(0, 7));

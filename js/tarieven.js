@@ -58,3 +58,37 @@ export const HEFFINGEN = {
 
 // Minimum voor het capaciteitstarief (kW).
 export const MIN_PIEK = 2.5;
+
+// ---------- Eigen contracten en tarieven (ingevuld bij Gegevens) ----------
+// Gaan voor op de waarden hierboven. Zonder contract of tarieven voor een dag wordt er niets berekend.
+let eigen = { contracten: [], net: {} };
+
+export function zetEigen(inst = {}) {
+  eigen = { contracten: Array.isArray(inst.contracten) ? inst.contracten : [], net: inst.net || {} };
+}
+
+const naarContract = (c) => ({
+  naam: c.naam, van: c.van, tot: c.tot, vast: !!c.vast, eigen: true, id: c.id,
+  vergoeding: c.vergoeding ?? VASTE_VERGOEDING,
+  prijs: c.vast ? () => c.prijs : (i) => (c.factor * i + c.constante) * BTW,
+  formule: c.vast ? `${String(c.prijs).replace('.', ',')} c€/kWh incl. btw` : `${String(c.factor).replace('.', ',')} × index + ${String(c.constante).replace('.', ',')} c€/kWh excl. btw`,
+});
+
+// Eigen contracten eerst, zodat ze voorgaan bij overlap.
+export function contracten(soort) {
+  return [...eigen.contracten.filter((c) => c.soort === soort).map(naarContract), ...CONTRACTEN[soort]];
+}
+
+export function netVoor(soort, jaar) {
+  const e = eigen.net?.[jaar]?.[soort];
+  if (e) return e;
+  return NET[soort][jaar] ?? null;
+}
+
+export function gscVoor(jaar) {
+  const e = eigen.net?.[jaar]?.stroom?.gsc;
+  if (e != null) return e;
+  return GSC_WKK[jaar] ?? null;
+}
+
+export const eigenNetJaren = () => Object.keys(eigen.net || {});

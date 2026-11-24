@@ -1,11 +1,15 @@
 import { BELPEX_RLP, TTF_RLP } from './indexen.js';
 import {
-  START, CONTRACTEN, VASTE_VERGOEDING, NET, GSC_WKK, HEFFINGEN, MIN_PIEK,
+  START, VASTE_VERGOEDING, NET, GSC_WKK, HEFFINGEN, MIN_PIEK, contracten, netVoor, gscVoor,
 } from './tarieven.js';
 
-export const contractOp = (soort, datum, schatting = false) =>
-  CONTRACTEN[soort].find((c) => datum >= c.van && datum <= c.tot)
-  || (schatting && datum > CONTRACTEN[soort].at(-1).tot ? CONTRACTEN[soort].at(-1) : null);
+export function contractOp(soort, datum, schatting = false) {
+  const lijst = contracten(soort);
+  const c = lijst.find((x) => datum >= x.van && datum <= x.tot);
+  if (c || !schatting) return c || null;
+  const laatste = [...lijst].sort((a, b) => (a.tot < b.tot ? -1 : 1)).at(-1);
+  return laatste && datum > laatste.tot ? laatste : null;
+}
 
 // Index van een maand; bij een schatting de laatst gekende waarde als de maand nog niet gepubliceerd is.
 export function indexVan(tabel, ym, schatting = false) {
@@ -21,10 +25,31 @@ const geldend = (lijst, datum) => {
   return w;
 };
 
-const jaarVan = (datum, tabel) => {
+// Tarieven van het kalenderjaar; bestaan die niet, dan null (niets berekenen). Alleen voor de prognose
+// wordt het laatst gekende jaar gebruikt.
+function netVan(soort, datum, schatting) {
   const j = +datum.slice(0, 4);
-  return tabel[j] || tabel[Math.max(...Object.keys(tabel).map(Number))];
-};
+  const t = netVoor(soort, j);
+  if (t || !schatting) return t;
+  const jaren = Object.keys(NET[soort]).map(Number).filter((x) => x < j);
+  return jaren.length ? NET[soort][Math.max(...jaren)] : null;
+}
+function gscVan(datum, schatting) {
+  const j = +datum.slice(0, 4);
+  const w = gscVoor(j);
+  if (w != null || !schatting) return w;
+  const jaren = Object.keys(GSC_WKK).map(Number).filter((x) => x < j);
+  return jaren.length ? GSC_WKK[Math.max(...jaren)] : null;
+}
+
+// Waarom een dag niet berekend kan worden (of null als het wel kan).
+export function ontbreekt(soort, datum) {
+  if (!contractOp(soort, datum)) return 'contract';
+  const c = contractOp(soort, datum);
+  if (!(soort === 'gas' && c.vast) && indexVan(soort === 'stroom' ? BELPEX_RLP : TTF_RLP, datum.slice(0, 7)) == null) return 'index';
+  if (!netVoor(soort, +datum.slice(0, 4)) || (soort === 'stroom' && gscVoor(+datum.slice(0, 4)) == null)) return 'tarieven';
+  return null;
+}
 
 // Gemiddelde van de maandpieken over de laatste 12 maanden (t.e.m. deze maand), min. 2,5 kW.
 function rollendePiek(pieken, ym) {
@@ -54,14 +79,14 @@ export function kostenPerMaand(dagen, pieken, { schatting = false } = {}) {
     if (v.sd != null || v.sn != null) {
       const c = contractOp('stroom', d, schatting);
       const idx = indexVan(BELPEX_RLP, ym, schatting);
-      if (!c || idx == null) M.stroomOk = false;
+      const net = netVan('stroom', d, schatting), gsc = gscVan(d, schatting);
+      if (!c || idx == null || !net || gsc == null) M.stroomOk = false;
       else {
-        const net = jaarVan(d, NET.stroom);
         M.stroom.kwh += kwh;
         M.stroom.energie += c.prijs(idx) * kwh / 100;
         M.stroom.net += net.afname * kwh / 100 + (net.capaciteit * rollendePiek(pieken, ym) + net.databeheer) / 365;
-        M.stroom.heffingen += (jaarVan(d, GSC_WKK) + geldend(HEFFINGEN.stroom, d)) * kwh / 100;
-        M.stroom.vast += VASTE_VERGOEDING / 365;
+        M.stroom.heffingen += (gsc + geldend(HEFFINGEN.stroom, d)) * kwh / 100;
+        M.stroom.vast += (c.vergoeding ?? VASTE_VERGOEDING) / 365;
         M.stroom.dagen += 1;
       }
     }
@@ -70,14 +95,14 @@ export function kostenPerMaand(dagen, pieken, { schatting = false } = {}) {
     if (v.gk != null) {
       const c = contractOp('gas', d, schatting);
       const idx = indexVan(TTF_RLP, ym, schatting);
-      if (!c || (!c.vast && idx == null)) M.gasOk = false;
+      const net = netVan('gas', d, schatting);
+      if (!c || (!c.vast && idx == null) || !net) M.gasOk = false;
       else {
-        const net = jaarVan(d, NET.gas);
         M.gas.kwh += v.gk;
         M.gas.energie += c.prijs(idx) * v.gk / 100;
         M.gas.net += (net.distributie + net.transport) * v.gk / 100 + (net.vast + net.databeheer) / 365;
         M.gas.heffingen += geldend(HEFFINGEN.gas, d) * v.gk / 100;
-        M.gas.vast += VASTE_VERGOEDING / 365;
+        M.gas.vast += (c.vergoeding ?? VASTE_VERGOEDING) / 365;
         M.gas.dagen += 1;
       }
     }

@@ -1,0 +1,36 @@
+name: Beursindexen bijwerken
+
+# Elke dag: kijkt of DATS24 een nieuwe maandindex (Belpex RLP / TTF RLP) gepubliceerd heeft
+# en zet die in js/indexen.js. Faalt de controle, dan stuurt GitHub een mail en verandert er niets.
+on:
+  schedule:
+    - cron: '23 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+
+jobs:
+  bijwerken:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: pdftotext installeren
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils
+      - name: Indexen ophalen
+        run: python3 scripts/indexen.py
+      - name: Opslaan en online zetten
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if git diff --quiet js/indexen.js; then
+            echo "Geen nieuwe maanden."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add js/indexen.js
+          git commit -m "Nieuwe beursindex"
+          git push
+          gh api -X POST "repos/${{ github.repository }}/pages/builds" || true

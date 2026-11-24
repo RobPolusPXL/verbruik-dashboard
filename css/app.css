@@ -182,3 +182,10 @@ body > main > .chips { margin: 0 2px 4px; }
   /* Drukste dagen: naast elkaar */
   [data-id="drukste"] .conclusies { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
+
+/* Formulieren met twee velden naast elkaar */
+.velden2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+.velden2 input, .velden2 select { min-width: 0; }
+.link { font: inherit; font-size: 12px; color: var(--slecht); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; }
+.importlijst small { color: var(--mute); }
+span.slecht { color: var(--slecht); }
