@@ -175,6 +175,10 @@ body > main > .chips { margin: 0 2px 4px; }
   /* Ringen: naast elkaar op één rij */
   [data-id="jaren"] .ringen { grid-template-columns: repeat(auto-fit, minmax(160px, 220px)); justify-content: start; gap: 24px 40px; }
 
+  /* Per jaar naast de bollen: grafiek even hoog als de bollen */
+  .rij > [data-id="jaar"] .grafiek { max-height: 200px; }
+  .rij > [data-id="jaren"] .ringen { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 16px; justify-content: stretch; }
+
   /* Vast of variabel: blokken naast elkaar */
   .vv-rij { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px; }
   .vv-rij > .vv + .vv { border-top: 0; padding-top: 0; }

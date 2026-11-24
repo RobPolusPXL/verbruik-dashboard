@@ -571,7 +571,7 @@ function render(boven = true) {
 const INDELING = {
   '': [['contractstatus'], ['ringen', 'kosten12', 'prognose']],
   stroom: [['jaren'], ['maand', 'jaar'], ['uur', 'dagprofiel'], ['piek', ['sluip', 'dagnacht']], ['drukste']],
-  gas: [['jaren'], ['maand', 'temp', 'jaar'], ['uur', 'dagprofiel']],
+  gas: [['jaren', 'jaar'], ['maand', 'temp'], ['uur', 'dagprofiel']],
   kosten: [['kmaand', 'kjaar'], ['split', 'prognose'], ['vastvar']],
   import: [['import', ['instellingen', 'plaats', 'account']], ['contracten', 'tarieven']],
 };
