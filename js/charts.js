@@ -20,7 +20,7 @@ export function ring(frac, kleur, label, groot, klein) {
 // reeksen: [{ naam, kleur, waarden: [12] }], fmt: getal → tekst
 export function gegroepeerd(reeksen, maandLabels, fmt, label) {
   const W = 350, H = 170, onder = 18, boven = 6;
-  const max = Math.max(1, ...reeksen.flatMap((r) => r.waarden.filter((v) => v != null)));
+  const max = Math.max(1e-6, ...reeksen.flatMap((r) => r.waarden.filter((v) => v != null)));
   const groep = W / 12, binnen = groep * 0.78, sw = binnen / reeksen.length;
   let s = '';
   for (let m = 0; m < 12; m++) {
