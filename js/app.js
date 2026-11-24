@@ -272,6 +272,7 @@ function plaatsKaart() {
       <div class="veld"><span>&nbsp;</span><button type="submit" class="knop">Zoeken</button></div>
     </div>
     <label class="knop">Uit een factuur halen (PDF)<input id="factuur" type="file" accept="application/pdf,.pdf" hidden></label>
+    <p class="uitleg">Werkt alleen met facturen van <b>Energie.be</b>.</p>
     ${keuzes.length ? `<ul class="importlijst">${keuzes.map((k, i) => `<li><b>${esc(k.naam)}</b>${k.postcode ? ` (${esc(k.postcode)})` : ''}${k.provincie ? `, ${esc(k.provincie)}` : ''}
       <button type="button" class="link kies" data-actie="plaats-kies" data-waarde="${i}">Kiezen</button></li>`).join('')}</ul>` : ''}
     ${state.plaatsMelding ? `<p class="melding">${esc(state.plaatsMelding)}</p>` : ''}
@@ -420,7 +421,7 @@ function kostenScherm() {
     <p class="uitleg">Lichtere staven zijn onvolledige jaren. De kosten worden berekend vanaf april 2025.</p></section>
   ${p ? prognoseKaart(p, false) : `<section class="kaart" data-id="prognose"><h2>Verwachte jaarafrekening</h2><p class="uitleg">Vul je maandelijkse voorschot in bij <a href="#/import"><b>Gegevens</b></a> om te zien of je geld terugkrijgt of moet bijbetalen.</p></section>`}
   ${vastVariabelKaart(kosten)}
-  <p class="uitleg los">Berekend per dag met de tariefkaart van je contract, de gepubliceerde beursindex van de maand en de nettarieven van Fluvius Limburg. April 2025 – maart 2026 is gecontroleerd met je jaarafrekening.</p>`;
+  <p class="uitleg los"><b>Werkt alleen voor Energie.be:</b> de contracten en nettarieven in de app zijn die van Energie.be (nettarieven Fluvius Limburg). Berekend per dag met de tariefkaart van je contract, de gepubliceerde beursindex van de maand en de nettarieven van Fluvius Limburg. April 2025 – maart 2026 is gecontroleerd met je jaarafrekening.</p>`;
 }
 
 function vastVariabelKaart(kosten) {
