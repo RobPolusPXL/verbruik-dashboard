@@ -292,3 +292,18 @@ export function lekNachten(dagenLijst, uren) {
   const verdachteDagen = nachten.filter((d) => Math.min(...uren[d].slice(1, 5)) > 0);
   return { nachten: nachten.length, verdacht: verdachteDagen.length, dagen: verdachteDagen };
 }
+
+// Laatste 7 dagen met data tegen de 7 dagen daarvoor.
+export function weekTegenWeek(dagen, waarde) {
+  const ds = Object.keys(dagen).filter((d) => waarde(dagen[d]) != null).sort();
+  if (ds.length < 14) return null;
+  const eind = ds.at(-1);
+  const dag = (n) => new Date(Date.parse(eind + 'T00:00:00Z') - n * 864e5).toISOString().slice(0, 10);
+  const som = (van, tot) => { let s = 0, n = 0; for (let i = van; i <= tot; i++) { const v = dagen[dag(i)]; if (v && waarde(v) != null) { s += waarde(v); n++; } } return n === 7 ? s : null; };
+  const nu = som(0, 6), vorig = som(7, 13);
+  if (nu == null || vorig == null) return null;
+  return { nu, vorig, van: dag(6), tot: eind, pct: vorig ? (nu / vorig - 1) * 100 : null };
+}
+
+// Gemiddeld kraanwaterverbruik per persoon per dag in Vlaanderen, naar gezinsgrootte (VMM, Waterboek 2022).
+export const VMM_WATER = { 1: 103, 2: 85, 3: 82, 4: 74, 5: 71 };

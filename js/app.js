@@ -135,6 +135,9 @@ function overzicht() {
 
   ${contractStatusKaart()}
 
+  ${herinneringKaart()}
+  ${weekKaart()}
+
   ${s || g ? `<section class="kaart" data-id="ringen">
     <div class="kaart-kop"><h2>Dit jaar tegen vorig jaar</h2><span>t.e.m. ${datumKort((g || s).laatste)}</span></div>
     <div class="ringen">${g ? ringBlok('Gas', g, 'm³', KLEUR.gas) : ''}${s ? ringBlok('Stroom', s, 'kWh', KLEUR.stroom) : ''}</div>
@@ -187,6 +190,37 @@ function contractStatusKaart() {
     <div class="kaart-kop"><h2>${dringend ? 'Actie nodig' : 'Contracten'}</h2></div>${conclusies(items)}</section>`;
 }
 
+// Herinnering als de laatste data van een soort ouder is dan een maand.
+function herinneringKaart() {
+  const { dagen } = state.data;
+  const vandaag = new Date().toISOString().slice(0, 10);
+  const items = ['stroom', 'gas', 'water'].map((soort) => {
+    const e = ENERGIE[soort];
+    const ds = Object.keys(dagen).filter((d) => e.waarde(dagen[d]) != null);
+    if (!ds.length) return null;
+    const laatste = ds.sort().at(-1);
+    const oud = Math.round((Date.parse(vandaag) - Date.parse(laatste)) / 864e5);
+    return oud > 31 ? { t: `Je laatste <b>${soort}data</b> is van ${datumJaar(laatste)}, ${oud} dagen geleden. Laad een nieuwe export in.`, toon: 'slecht' } : null;
+  }).filter(Boolean);
+  if (!items.length) return '';
+  return `<a class="kaart let-op" data-id="herinnering" href="#/import"><div class="kaart-kop"><h2>Nieuwe gegevens inladen</h2></div>${conclusies(items)}</a>`;
+}
+
+// De laatste 7 dagen tegen de 7 dagen daarvoor.
+function weekKaart() {
+  const rijen = ['stroom', 'gas', 'water'].map((soort) => {
+    const e = ENERGIE[soort];
+    const w = A.weekTegenWeek(state.data.dagen, e.waarde);
+    if (!w) return '';
+    return `<div class="week-rij"><span><i style="background:${e.kleur}"></i>${e.naam}</span>
+      <b>${e.fmt(w.nu)} <small>${e.eenheid}</small></b>
+      <span class="sub">vorige week ${e.fmt(w.vorig)}</span>${delta(w.pct)}
+      <small class="week-periode">${datumKort(w.van)} – ${datumKort(w.tot)}</small></div>`;
+  }).join('');
+  if (!rijen) return '';
+  return `<section class="kaart" data-id="week"><div class="kaart-kop"><h2>Week tegen week</h2><span>laatste 7 dagen met data</span></div>${rijen}</section>`;
+}
+
 function ringBlok(naam, y, eenheid, kleur) {
   const pctTxt = y.pct == null ? '—' : `${y.pct > 0 ? '+' : '−'}${f1(Math.abs(y.pct))}%`;
   return `<div class="ring-blok">
@@ -224,6 +258,22 @@ function jarenRingen(dagen, e, y) {
 }
 
 // ---------- Water ----------
+function persoonKaart(dagen) {
+  const n = +state.instellingen.bewoners || 0;
+  const kop = '<div class="kaart-kop"><h2>Per persoon</h2><span>laatste 30 dagen</span></div>';
+  if (!n) return `<section class="kaart" data-id="persoon">${kop}<p class="uitleg">Vul bij <a href="#/import"><b>Gegevens</b></a> het aantal bewoners in om je waterverbruik per persoon te zien.</p></section>`;
+  const ds = Object.keys(dagen).filter((d) => dagen[d].wl != null).sort().slice(-30);
+  if (!ds.length) return '';
+  const perPersoon = ds.reduce((a, d) => a + dagen[d].wl, 0) / ds.length / n;
+  const ref = A.VMM_WATER[Math.min(5, n)];
+  const pct = (perPersoon / ref - 1) * 100;
+  return `<section class="kaart" data-id="persoon">${kop}
+    <div class="vergelijk"><div><span>Jullie (${n} ${n === 1 ? 'persoon' : 'personen'})</span><b>${f0(perPersoon)} <small>l/dag</small></b></div>
+      <div><span>Vlaams gemiddelde${n > 5 ? ' (5+)' : ''}</span><b>${ref} <small>l/dag</small></b></div></div>
+    <p class="uitleg">${Math.abs(pct) < 5 ? 'Ongeveer gemiddeld' : `${f0(Math.abs(pct))}% ${pct < 0 ? 'onder' : 'boven'} het gemiddelde`} voor een gezin van ${n > 5 ? '5 of meer' : n} ${n === 1 ? 'persoon' : 'personen'}. Bron: VMM, kraanwaterverbruik per gezinsgrootte (2022), ${ds.length} dagen gemeten.</p></section>`;
+}
+
+
 function lekKaart(wuren) {
   const ds = Object.keys(wuren).sort().slice(-14);
   if (ds.length < 3) return '';
@@ -379,7 +429,7 @@ function energieScherm(soort) {
 
   const uurData = soort === 'gas' ? uren : soort === 'water' ? wuren : suren;
   const uk = uurKaart(soort, uurData, e, soort === 'gas' ? 'm³' : soort === 'water' ? 'l' : 'kWh');
-  if (soort === 'water') extra = lekKaart(wuren);
+  if (soort === 'water') extra = lekKaart(wuren) + persoonKaart(dagen);
 
   return `${detailKop(e.naam)}
   <div class="kop-getal"><div class="groot" style="color:${e.kleur}">${e.fmt(y.nu)}<small>${e.eenheid}</small></div>
@@ -491,6 +541,7 @@ function importScherm() {
   </section>
   <form class="kaart" data-id="instellingen" id="instellingen">
     <h2>Instellingen</h2>
+    <label class="veld"><span>Aantal bewoners</span><input name="bewoners" type="number" inputmode="numeric" step="1" min="1" max="20" value="${esc(i.bewoners ?? '')}"></label>
     <label class="veld"><span>Maandelijks voorschot (€, incl. btw)</span><input name="voorschot" type="number" inputmode="decimal" step="0.01" min="0" value="${esc(i.voorschot ?? '')}"></label>
     <label class="veld"><span>Afrekeningsperiode begint in</span><select name="startMaand">${MAAND_VOL.map((m, n) => `<option value="${n + 1}" ${(+(i.startMaand ?? 4)) === n + 1 ? 'selected' : ''}>${m}</option>`).join('')}</select></label>
     <label class="veld"><span>Vaste stroomprijs om te vergelijken (c€/kWh incl. btw)</span><input name="vasteStroomprijs" type="number" inputmode="decimal" step="0.01" min="0" value="${esc(i.vasteStroomprijs ?? '')}"></label>
@@ -502,6 +553,10 @@ function importScherm() {
   <section class="kaart" data-id="account">
     <h2>Account</h2>
     <p class="uitleg">Aangemeld als ${esc(state.user.email || state.user.displayName || '')}. ${Object.keys(state.data.dagen).length} dagen opgeslagen.</p>
+    <div class="knoppen">
+      <button type="button" class="knop" id="export-csv">Download per dag (CSV)</button>
+      <button type="button" class="knop" id="export-json">Download alles (back-up)</button>
+    </div>
     ${state.user.demo ? '' : '<button type="button" class="knop" id="afmelden">Afmelden</button>'}
   </section>`;
 }
@@ -513,6 +568,29 @@ async function bewaarInst(extra, veld) {
     state.instellingen = nieuw; state[veld] = 'Bewaard.';
   } catch (err) { state[veld] = 'Bewaren mislukt: ' + err.message; }
   render(false);
+}
+
+// ---------- Export ----------
+function exporteer(soort) {
+  const { dagen, uren, suren, wuren, pieken } = state.data;
+  const datum = new Date().toISOString().slice(0, 10);
+  let inhoud, naam, type;
+  if (soort === 'csv') {
+    const getal = (v, d) => (v == null ? '' : String(+v.toFixed(d)).replace('.', ','));
+    const regels = ['datum;stroom dag (kWh);stroom nacht (kWh);gas (m³);gas (kWh);water (liter)'];
+    for (const d of Object.keys(dagen).sort()) {
+      const v = dagen[d];
+      regels.push([d, getal(v.sd, 3), getal(v.sn, 3), getal(v.gm, 3), getal(v.gk, 3), getal(v.wl, 0)].join(';'));
+    }
+    inhoud = '\uFEFF' + regels.join('\r\n'); naam = `verbruik-per-dag-${datum}.csv`; type = 'text/csv;charset=utf-8';
+  } else {
+    inhoud = JSON.stringify({ gemaakt: new Date().toISOString(), dagen, uren, suren, wuren, pieken, instellingen: state.instellingen }, null, 1);
+    naam = `verbruik-backup-${datum}.json`; type = 'application/json';
+  }
+  const url = URL.createObjectURL(new Blob([inhoud], { type }));
+  const a = Object.assign(document.createElement('a'), { href: url, download: naam });
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 // ---------- weergave ----------
@@ -533,10 +611,10 @@ function render(boven = true) {
 // Vaste indeling per scherm: elke rij bevat kaarten van dezelfde soort, zodat ze even hoog zijn.
 // Een rij is een lijst van vakken; een vak is één kaart of een lijst kaarten onder elkaar.
 const INDELING = {
-  '': [['lekalarm'], ['contractstatus'], ['ringen', 'kosten12', 'prognose']],
+  '': [['herinnering'], ['lekalarm'], ['contractstatus'], ['week'], ['ringen', 'kosten12', 'prognose']],
   stroom: [['jaren'], ['maand', 'jaar'], ['uur', 'dagprofiel'], ['piek', ['sluip', 'dagnacht']], ['drukste']],
   gas: [['jaren', 'jaar'], ['maand', 'temp'], ['uur', 'dagprofiel']],
-  water: [['jaren', 'jaar'], ['maand', 'lek'], ['uur', 'dagprofiel']],
+  water: [['jaren', 'jaar'], ['maand', ['lek', 'persoon']], ['uur', 'dagprofiel']],
   kosten: [['kmaand', 'kjaar'], ['split', 'prognose'], ['vastvar']],
   import: [['import', ['instellingen', 'plaats', 'account']]],
 };
@@ -594,6 +672,8 @@ document.addEventListener('click', async (e) => {
   const { actie, waarde, soort } = knop.dataset;
   if (knop.id === 'aanmelden') {
     try { await store.login(); } catch (err) { state.fout = 'Aanmelden mislukt: ' + err.message; render(); }
+  } else if (knop.id === 'export-csv' || knop.id === 'export-json') {
+    exporteer(knop.id === 'export-csv' ? 'csv' : 'json');
   } else if (knop.id === 'afmelden') {
     await store.logout();
   } else if (knop.id === 'opslaan') {
@@ -644,7 +724,7 @@ document.addEventListener('submit', async (e) => {
     return;
   }
   if (id === 'instellingen') {
-    const data = { voorschot: null, startMaand: 4, vasteStroomprijs: null, vasteGasprijs: null };
+    const data = { bewoners: null, voorschot: null, startMaand: 4, vasteStroomprijs: null, vasteGasprijs: null };
     for (const k of Object.keys(data)) data[k] = k === 'startMaand' ? +fd[k] : getal(k);
     await bewaarInst(data, 'instMelding');
   }
