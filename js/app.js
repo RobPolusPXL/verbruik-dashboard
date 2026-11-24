@@ -208,7 +208,7 @@ function uurKaart(soort, uren, e, eenheidUur) {
   const vorige = beschikbaar.filter((m) => m < huidig).at(-1) ?? null;
   const volgende = keuze ? (beschikbaar.filter((m) => m > keuze && m < laatsteMaand).at(0) ?? 'laatste') : null;
   const gem = Array.from({ length: 24 }, (_, u) => dagenLijst.reduce((a, d) => a + (uren[d][u] ?? 0), 0) / dagenLijst.length);
-  return `<section class="kaart">
+  return `<section class="kaart uur">
     <div class="kaart-kop bladeren">
       <button type="button" class="pijl" data-actie="uur-vorige" data-soort="${soort}" data-waarde="${vorige ?? ''}" ${vorige ? '' : 'disabled'} aria-label="Vorige maand">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>

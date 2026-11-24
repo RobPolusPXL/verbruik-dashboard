@@ -158,7 +158,8 @@ body > main > .chips { margin: 0 2px 4px; }
   nav svg { width: 20px; height: 20px; }
 
   main { max-width: 1800px; margin: 0 0 0 220px; padding: 36px 40px 48px;
-    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: stretch; }
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start; grid-auto-flow: row dense; }
+  main > .kaart.uur { grid-row: span 2; }
   main > * { margin: 0; min-width: 0; }
   main > .kop, main > .kop-getal, main > .chips, main > .tegels, main > .leeg, main > .los,
   main > .laden, main > .kern { grid-column: 1 / -1; }
