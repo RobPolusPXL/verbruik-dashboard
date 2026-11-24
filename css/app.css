@@ -198,13 +198,11 @@ span.slecht { color: var(--slecht); }
 .kaart.let-op { border-color: rgba(242, 166, 90, .55); }
 
 /* Week tegen week */
-.week-rij { display: grid; grid-template-columns: 1fr auto; grid-template-areas: "naam waarde" "vorig delta" "periode periode"; gap: 2px 10px; padding: 10px 0; border-top: 1px solid var(--rand); }
-.week-rij:first-of-type { border-top: 0; padding-top: 0; }
-.week-rij > span:first-child { grid-area: naam; display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--zacht); }
-.week-rij > span:first-child i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-.week-rij > b { grid-area: waarde; font-family: 'Space Grotesk', sans-serif; font-size: 18px; text-align: right; font-variant-numeric: tabular-nums; }
-.week-rij > b small { font-size: 11px; color: var(--mute); font-weight: 500; }
-.week-rij > .sub { grid-area: vorig; font-size: 12px; }
-.week-rij > .delta { grid-area: delta; justify-self: end; }
-.week-periode { grid-area: periode; font-size: 11px; color: var(--mute); }
+.week-rij { display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: 8px; }
+.week-kol { display: flex; flex-direction: column; gap: 3px; padding: 10px; border-radius: 12px; background: rgba(255,255,255,.03); border: 1px solid var(--rand); min-width: 0; }
+.wk-naam { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--mute); }
+.wk-naam i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.week-kol b { font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.week-kol b small { font-size: 11px; color: var(--mute); font-weight: 500; }
+.wk-vorig { font-size: 11px; color: var(--mute); }
 .knoppen { display: flex; flex-wrap: wrap; gap: 8px; }

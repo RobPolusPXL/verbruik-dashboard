@@ -206,19 +206,22 @@ function herinneringKaart() {
   return `<a class="kaart let-op" data-id="herinnering" href="#/import"><div class="kaart-kop"><h2>Nieuwe gegevens inladen</h2></div>${conclusies(items)}</a>`;
 }
 
-// De laatste 7 dagen tegen de 7 dagen daarvoor.
+// De laatste 7 dagen tegen de 7 dagen daarvoor, naast elkaar.
 function weekKaart() {
-  const rijen = ['stroom', 'gas', 'water'].map((soort) => {
+  let periode = '';
+  const kol = ['stroom', 'gas', 'water'].map((soort) => {
     const e = ENERGIE[soort];
     const w = A.weekTegenWeek(state.data.dagen, e.waarde);
     if (!w) return '';
-    return `<div class="week-rij"><span><i style="background:${e.kleur}"></i>${e.naam}</span>
-      <b>${e.fmt(w.nu)} <small>${e.eenheid}</small></b>
-      <span class="sub">vorige week ${e.fmt(w.vorig)}</span>${delta(w.pct)}
-      <small class="week-periode">${datumKort(w.van)} – ${datumKort(w.tot)}</small></div>`;
-  }).join('');
-  if (!rijen) return '';
-  return `<section class="kaart" data-id="week"><div class="kaart-kop"><h2>Week tegen week</h2><span>laatste 7 dagen met data</span></div>${rijen}</section>`;
+    periode ||= `${datumKort(w.van)} – ${datumKort(w.tot)}`;
+    return `<div class="week-kol"><span class="wk-naam"><i style="background:${e.kleur}"></i>${e.naam}</span>
+      <b>${e.fmt(w.nu)}<small> ${e.eenheid}</small></b>
+      ${delta(w.pct)}
+      <span class="wk-vorig">vorige: ${e.fmt(w.vorig)}</span></div>`;
+  }).filter(Boolean);
+  if (!kol.length) return '';
+  return `<section class="kaart" data-id="week"><div class="kaart-kop"><h2>Week tegen week</h2><span>${periode}</span></div>
+    <div class="week-rij" style="--n:${kol.length}">${kol.join('')}</div></section>`;
 }
 
 function ringBlok(naam, y, eenheid, kleur) {
