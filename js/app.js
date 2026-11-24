@@ -527,12 +527,18 @@ function importScherm() {
   const imps = state.imports, i = state.instellingen;
   return `${detailKop('Gegevens')}
   <section class="kaart" data-id="import">
-    <h2>Fluvius-export inladen</h2>
+    <h2>Gegevens inladen</h2>
+    <h3 class="tussenkop">Stroom en gas</h3>
     <ol class="stappen">
       <li>Mijn Fluvius → Verbruik → exporteer als CSV.</li>
       <li>Stroom: <b>kwartiertotalen</b>. Gas: <b>dagtotalen</b>, en <b>uurtotalen</b> voor de grafiek per uur.</li>
-      <li>Kies hier de bestanden. Dubbele dagen worden overschreven.</li>
     </ol>
+    <h3 class="tussenkop">Water</h3>
+    <ol class="stappen">
+      <li>Klantenportaal van je waterbedrijf → Evolutie van je waterverbruik → exporteer als CSV.</li>
+      <li>Kies <b>per uur</b> en de periode vanaf je laatste export. Het portaal gaat maximaal 6 maanden terug.</li>
+    </ol>
+    <p class="uitleg">Kies hieronder de bestanden; stroom, gas en water mogen samen. De app herkent zelf welk bestand wat is. Dubbele dagen worden overschreven.</p>
     <label class="knop">Bestanden kiezen<input id="bestanden" type="file" accept=".csv,text/csv" multiple hidden></label>
     ${imps.length ? `<ul class="importlijst">${imps.map((x) => `<li class="${x.fout ? 'fout' : ''}"><b>${esc(x.naam)}</b><br>${
       x.fout ? esc(x.fout) : `${x.soort}, ${x.resolutie}: ${x.aantalDagen} dagen (${datumJaar(x.van)} – ${datumJaar(x.tot)})`}</li>`).join('')}</ul>
