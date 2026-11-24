@@ -156,6 +156,7 @@ body > main > .chips { margin: 0 2px 4px; }
   nav a:hover { color: var(--zacht); background: rgba(255,255,255,.03); }
   nav a.actief { background: var(--kaart); color: #fff; }
   nav svg { width: 19px; height: 19px; }
+  nav a[href="#/import"] { margin-top: auto; }
 
   main { max-width: 1240px; margin: 0 auto; padding: 40px 48px 64px 280px; box-sizing: content-box; gap: 20px; }
   .terug { display: none; }
