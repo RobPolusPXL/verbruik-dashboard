@@ -1,4 +1,4 @@
-// Afgeleide cijfers: totalen, vergelijkingen, prognose, sluipverbruik en weercorrectie.
+// Afgeleide cijfers: totalen, vergelijkingen, prognose, sluipverbruik en conclusies.
 import { kostenPerMaand, contractOp, indexVan } from './kosten.js';
 import { CONTRACTEN } from './tarieven.js';
 import { TTF_RLP } from './indexen.js';
@@ -156,60 +156,6 @@ export function sluipverbruik(suren, kosten) {
   return { watt, jaarKwh, jaarEur: prijs ? jaarKwh * prijs : null, nachten: nachten.length };
 }
 
-// ---------- Weer en graaddagen ----------
-// Gemiddelde dagtemperatuur in Zonhoven via Open-Meteo (gratis, zonder sleutel).
-const LAT = 50.99, LON = 5.37, BASIS = 16.5; // graaddagen t.o.v. 16,5 °C, zoals in België gebruikelijk
-
-export async function haalTemperaturen(van, tot) {
-  const sleutel = `verbruik-weer-${van}`;
-  let cache = {};
-  try { cache = JSON.parse(localStorage.getItem(sleutel) || '{}'); } catch { /* geen cache */ }
-  const ontbreekt = (d) => cache[d] == null;
-  const gisteren = plusDagen(new Date().toISOString().slice(0, 10), -1);
-  const eind = tot < gisteren ? tot : gisteren;
-  const archiefEind = plusDagen(eind, -6);
-  const urls = [];
-  if (ontbreekt(van) || ontbreekt(archiefEind)) {
-    urls.push(`https://archive-api.open-meteo.com/v1/archive?latitude=${LAT}&longitude=${LON}&start_date=${van}&end_date=${archiefEind}&daily=temperature_2m_mean&timezone=Europe%2FBrussels`);
-  }
-  urls.push(`https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&past_days=31&forecast_days=1&daily=temperature_2m_mean&timezone=Europe%2FBrussels`);
-  for (const u of urls) {
-    const r = await fetch(u);
-    if (!r.ok) throw new Error('Weergegevens niet beschikbaar');
-    const j = await r.json();
-    j.daily.time.forEach((d, i) => { if (j.daily.temperature_2m_mean[i] != null && d <= eind) cache[d] = j.daily.temperature_2m_mean[i]; });
-  }
-  try { localStorage.setItem(sleutel, JSON.stringify(cache)); } catch { /* vol */ }
-  return cache;
-}
-
-export const graaddag = (t) => Math.max(0, BASIS - t);
-
-// Gas per graaddag per maand (alleen maanden met genoeg stookdagen) en voor de laatste 30 dagen.
-export function gasPerGraaddag(dagen, temp) {
-  const m = {};
-  for (const [d, v] of Object.entries(dagen)) {
-    if (v.gm == null || temp[d] == null) continue;
-    const ym = d.slice(0, 7);
-    (m[ym] ||= { gas: 0, gd: 0 });
-    m[ym].gas += v.gm; m[ym].gd += graaddag(temp[d]);
-  }
-  const perMaand = {};
-  for (const [ym, x] of Object.entries(m)) if (x.gd >= 60) perMaand[ym] = x.gas / x.gd;
-
-  const met = Object.keys(dagen).filter((d) => dagen[d].gm != null && temp[d] != null).sort();
-  const laatste = met.at(-1);
-  const venster = (eind) => {
-    let gas = 0, gd = 0;
-    for (let i = 0; i < 30; i++) {
-      const d = plusDagen(eind, -i);
-      if (dagen[d]?.gm != null && temp[d] != null) { gas += dagen[d].gm; gd += graaddag(temp[d]); }
-    }
-    return gd >= 30 ? { gas, gd, perGd: gas / gd } : null;
-  };
-  return { perMaand, recent: laatste ? venster(laatste) : null, vorigJaar: laatste ? venster(jaarErbij(laatste, -1)) : null, laatste };
-}
-
 // Elk jaar over dezelfde periode (1 jan t.e.m. de laatste dag met data). Alleen jaren die die periode volledig dekken.
 export function zelfdePeriode(dagen, waarde) {
   const met = Object.keys(dagen).filter((d) => waarde(dagen[d]) != null).sort();
@@ -225,6 +171,7 @@ export function zelfdePeriode(dagen, waarde) {
   return uit.sort((a, b) => a.jaar - b.jaar);
 }
 
+
 // ---------- Conclusies ----------
 // Geven zinnen terug als { t: 'html', toon?: 'ok' | 'slecht' }. Getallen worden door de aanroeper opgemaakt via fmt.
 const gem = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0);
@@ -237,7 +184,7 @@ function drukstBlok(profiel) {
   return { van: best, tot: best + 2, waarde: (profiel[best] + profiel[best + 1]) / 2 };
 }
 
-export function uurConclusies(soort, dagenLijst, uren, dagen, temp, fmt) {
+export function uurConclusies(soort, dagenLijst, uren, dagen, fmt) {
   if (dagenLijst.length < 5) return [];
   const prof = Array.from({ length: 24 }, (_, u) => gem(dagenLijst.map((d) => uren[d][u] ?? 0)));
   const nacht = gem(prof.slice(0, 6)), dag = gem(prof.slice(7, 23));
@@ -270,7 +217,7 @@ export function uurConclusies(soort, dagenLijst, uren, dagen, temp, fmt) {
       else uit.push({ t: 'Weekend en week verschillen nauwelijks in verbruik per dag.' });
     }
   }
-  const vj = tegenVorigJaar(soort, dagenLijst, dagen, temp);
+  const vj = tegenVorigJaar(soort, dagenLijst, dagen);
   if (vj) uit.push(vj);
   return uit;
 }
@@ -278,29 +225,15 @@ export function uurConclusies(soort, dagenLijst, uren, dagen, temp, fmt) {
 const f1nl = (v) => v.toLocaleString('nl-BE', { maximumFractionDigits: 1 });
 const vorigJaarDag = (d) => `${+d.slice(0, 4) - 1}${d.slice(4)}`;
 
-// Dezelfde dagen een jaar eerder. Gas altijd per graaddag, anders zegt het vooral iets over het weer.
-export function tegenVorigJaar(soort, dagenLijst, dagen, temp) {
-  const paren = dagenLijst.map((d) => [d, vorigJaarDag(d)]);
-  if (soort === 'stroom') {
-    const ok = paren.filter(([a, b]) => stroomKwh(dagen[a] || {}) != null && stroomKwh(dagen[b] || {}) != null);
-    if (ok.length < dagenLijst.length * 0.8) return null;
-    const nu = ok.reduce((s, [a]) => s + stroomKwh(dagen[a]), 0), toen = ok.reduce((s, [, b]) => s + stroomKwh(dagen[b]), 0);
-    const pct = (nu / toen - 1) * 100;
-    return { t: `Tegen dezelfde dagen vorig jaar: <b>${pct > 0 ? '+' : '−'}${f1nl(Math.abs(pct))}%</b> stroom.`, toon: pct > 2 ? 'slecht' : pct < -2 ? 'ok' : undefined };
-  }
-  if (!temp) return null;
-  const ok = paren.filter(([a, b]) => dagen[a]?.gm != null && dagen[b]?.gm != null && temp[a] != null && temp[b] != null);
+// Dezelfde dagen een jaar eerder: gewoon het gemeten verbruik.
+export function tegenVorigJaar(soort, dagenLijst, dagen) {
+  const w = soort === 'stroom' ? stroomKwh : gasM3;
+  const ok = dagenLijst.map((d) => [d, vorigJaarDag(d)]).filter(([a, b]) => dagen[a] && dagen[b] && w(dagen[a]) != null && w(dagen[b]) != null);
   if (ok.length < dagenLijst.length * 0.8) return null;
-  const som = (i, f) => ok.reduce((s, p) => s + f(p[i]), 0);
-  const gdNu = som(0, (d) => graaddag(temp[d])), gdToen = som(1, (d) => graaddag(temp[d]));
-  if (gdNu < 20 || gdToen < 20) return null;
-  const ruw = (som(0, (d) => dagen[d].gm) / som(1, (d) => dagen[d].gm) - 1) * 100;
-  const pct = ((som(0, (d) => dagen[d].gm) / gdNu) / (som(1, (d) => dagen[d].gm) / gdToen) - 1) * 100;
-  const koud = (gdNu / gdToen - 1) * 100;
-  return {
-    t: `Tegen dezelfde dagen vorig jaar: <b>${pct > 0 ? '+' : '−'}${f1nl(Math.abs(pct))}%</b> gas, gecorrigeerd voor het weer. ${Math.abs(koud) < 1 ? 'Het was ongeveer even koud.' : `Zonder correctie ${ruw > 0 ? '+' : '−'}${f1nl(Math.abs(ruw))}%, want het was ${f1nl(Math.abs(koud))}% ${koud > 0 ? 'kouder' : 'warmer'}.`}`,
-    toon: pct > 2 ? 'slecht' : pct < -2 ? 'ok' : undefined,
-  };
+  const nu = ok.reduce((s, [a]) => s + w(dagen[a]), 0), toen = ok.reduce((s, [, b]) => s + w(dagen[b]), 0);
+  if (!toen) return null;
+  const pct = (nu / toen - 1) * 100;
+  return { t: `Tegen dezelfde dagen vorig jaar: <b>${pct > 0 ? '+' : '−'}${f1nl(Math.abs(pct))}%</b> ${soort}.`, toon: pct > 2 ? 'slecht' : pct < -2 ? 'ok' : undefined };
 }
 
 // Hoogste maandpiek en wat 1 kW lager rollend gemiddelde per jaar scheelt.

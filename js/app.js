@@ -25,7 +25,6 @@ const $view = document.getElementById('view');
 const state = {
   user: null, gestart: false, data: null, instellingen: {}, imports: [], bezig: false, fout: null, melding: null,
   ui: { jaren: {}, uurMaand: {}, kostenJaar: 'laatste' },
-  weer: null, weerFout: null, weerBezig: false,
 };
 
 const ENERGIE = {
@@ -113,7 +112,6 @@ function overzicht() {
   const l12 = laatste12(kosten);
   const k = l12.length ? kostenVan(l12) : null;
   const p = A.prognose(state.data, state.instellingen);
-  const kern = kernConclusie(s);
 
   return `
   <header class="kop"><div class="sub">${DAG[nu.getDay()]} ${nu.getDate()} ${MND[nu.getMonth()]}</div><h1>Thuis</h1></header>
@@ -125,7 +123,6 @@ function overzicht() {
     ${ymNu ? `<a class="tegel" href="#/stroom"><div class="tl"><i style="background:${KLEUR.stroom}"></i>Piek</div>
       <div class="tw">${f2(pieken[ymNu])}<small>kW</small></div><div class="td">${maandLang(ymNu)}</div></a>` : ''}
   </div>
-  ${kern ? `<section class="kaart kern">${conclusies([kern])}</section>` : ''}
 
   ${s || g ? `<section class="kaart" data-id="ringen">
     <div class="kaart-kop"><h2>Dit jaar tegen vorig jaar</h2><span>t.e.m. ${datumKort((g || s).laatste)}</span></div>
@@ -138,20 +135,6 @@ function overzicht() {
   </a>` : ''}
 
   ${p ? prognoseKaart(p, true) : ''}`;
-}
-
-// Eén zin met het belangrijkste van het moment. In het stookseizoen: gas gecorrigeerd voor het weer.
-function kernConclusie(s) {
-  if (!state.weer && !state.weerFout && !state.weerBezig) laadWeer();
-  if (state.weer) {
-    const r = A.gasPerGraaddag(state.data.dagen, state.weer);
-    if (r.recent && r.vorigJaar && r.recent.gd >= 60) {
-      const pct = (r.recent.perGd / r.vorigJaar.perGd - 1) * 100;
-      return { t: `Gecorrigeerd voor het weer verbruik je de laatste 30 dagen <b>${f1(Math.abs(pct))}% ${pct > 0 ? 'meer' : 'minder'} gas</b> dan dezelfde periode vorig jaar.`, toon: pct > 2 ? 'slecht' : pct < -2 ? 'ok' : undefined };
-    }
-  }
-  if (s?.pct != null) return { t: `Dit jaar verbruik je <b>${f1(Math.abs(s.pct))}% ${s.pct > 0 ? 'meer' : 'minder'} stroom</b> dan vorig jaar over dezelfde periode.`, toon: s.pct > 2 ? 'slecht' : s.pct < -2 ? 'ok' : undefined };
-  return null;
 }
 
 function ringBlok(naam, y, eenheid, kleur) {
@@ -220,7 +203,7 @@ function uurKaart(soort, uren, e, eenheidUur) {
   </section>
   <section class="kaart" data-id="dagprofiel"><div class="kaart-kop"><h2>Gemiddelde dag</h2><span>${esc(titel.toLowerCase())}</span></div>
     ${dagprofiel(gem, e.kleur, (v) => `${f2(v)} ${eenheidUur}`, `Gemiddeld ${e.naam.toLowerCase()}verbruik per uur van de dag`)}
-    ${conclusies(A.uurConclusies(soort, dagenLijst, uren, state.data.dagen, state.weer, (v) => `${f2(v)} ${eenheidUur}`))}
+    ${conclusies(A.uurConclusies(soort, dagenLijst, uren, state.data.dagen, (v) => `${f2(v)} ${eenheidUur}`))}
   </section>`;
 }
 
@@ -261,8 +244,6 @@ function energieScherm(soort) {
         : '<p class="uitleg">Laad je stroomexport met <b>kwartiertotalen</b> (opnieuw) in om je sluipverbruik te zien.</p>'}</section>
     <section class="kaart" data-id="dagnacht"><div class="kaart-kop"><h2>Dag en nacht, ${y.jaar}</h2></div>
       ${splitBalk([{ naam: 'Dag', v: dag, kleur: KLEUR.stroom }, { naam: 'Nacht', v: nacht, kleur: '#7A6A2E' }], (v) => `${f0(v)} kWh`)}</section>`;
-  } else {
-    extra = weerKaart();
   }
 
   const uurData = soort === 'gas' ? uren : suren;
@@ -281,42 +262,6 @@ function energieScherm(soort) {
   ${uk ?? (soort === 'stroom' ? '<section class="kaart" data-id="uur"><p class="uitleg">Laad je stroomexport met <b>kwartiertotalen</b> (opnieuw) in om je verbruik per uur te zien.</p></section>'
     : '<section class="kaart" data-id="uur"><p class="uitleg">Laad een gasexport met <b>uurtotalen</b> in om je verbruik per uur te zien.</p></section>')}
   ${extra}`;
-}
-
-// Gas gecorrigeerd voor het weer
-function weerKaart() {
-  if (!state.weer && !state.weerFout) {
-    if (!state.weerBezig) laadWeer();
-    return '<section class="kaart" data-id="graaddag"><div class="kaart-kop"><h2>Gas per graaddag</h2></div><p class="uitleg">Weergegevens laden…</p></section>';
-  }
-  if (state.weerFout) return `<section class="kaart" data-id="graaddag"><div class="kaart-kop"><h2>Gas per graaddag</h2></div><p class="uitleg">${esc(state.weerFout)}</p></section>`;
-  const r = A.gasPerGraaddag(state.data.dagen, state.weer);
-  const beschikbaar = [...new Set(Object.keys(r.perMaand).map((m) => +m.slice(0, 4)))].sort();
-  const reeksen = jaarReeksen(r.perMaand, gekozenJaren('gas', beschikbaar).filter((j) => beschikbaar.includes(j)), KLEUR.gas);
-  const pct = r.recent && r.vorigJaar ? (r.recent.perGd / r.vorigJaar.perGd - 1) * 100 : null;
-  return `<section class="kaart" data-id="graaddag"><div class="kaart-kop"><h2>Gas per graaddag</h2></div>
-    <div class="gd-tekst"><p class="uitleg">Je gasverbruik gedeeld door hoe koud het was. Zo vergelijk je eerlijk, los van een zachte of strenge winter: lager is zuiniger.</p>
-    ${r.recent ? `<div class="vergelijk">
-      <div><span>Laatste 30 dagen</span><b>${f2(r.recent.perGd * 100)} <small>m³ / 100 gd</small></b></div>
-      <div><span>Zelfde periode vorig jaar</span><b>${r.vorigJaar ? `${f2(r.vorigJaar.perGd * 100)} <small>m³ / 100 gd</small>` : '—'}</b></div>
-    </div>${pct != null ? `<p class="uitleg">${delta(pct)} t.o.v. vorig jaar, gecorrigeerd voor de temperatuur.</p>` : ''}` : ''}</div>
-    ${reeksen.length ? `<div class="gd-grafiek">${legende(reeksen)}${gegroepeerd(reeksen, MAAND_VOL, (v) => `${f2(v * 100)} m³ per 100 graaddagen`, 'Gas per graaddag per maand')}
-    <p class="uitleg">Alleen stookmaanden. Graaddagen t.o.v. 16,5 °C, temperatuur in Zonhoven via Open-Meteo.</p></div>` : ''}
-  </section>`;
-}
-
-async function laadWeer() {
-  state.weerBezig = true;
-  try {
-    const van = Object.keys(state.data.dagen).filter((d) => state.data.dagen[d].gm != null).sort()[0];
-    const tot = Object.keys(state.data.dagen).sort().at(-1);
-    state.weer = await A.haalTemperaturen(van, tot);
-  } catch (e) {
-    state.weerFout = 'Weergegevens konden niet geladen worden. Probeer later opnieuw.';
-  }
-  state.weerBezig = false;
-  const r = location.hash.replace(/^#\/?/, '');
-  if (r === 'gas' || r === '') render(false);
 }
 
 // ---------- Kosten ----------
@@ -436,7 +381,7 @@ function render(boven = true) {
 const INDELING = {
   '': [['ringen', 'kosten12', 'prognose']],
   stroom: [['jaren'], ['maand', 'jaar'], ['uur', 'dagprofiel'], ['piek', ['sluip', 'dagnacht']], ['drukste']],
-  gas: [['jaren'], ['maand', 'jaar'], ['uur', 'dagprofiel'], ['graaddag']],
+  gas: [['jaren'], ['maand', 'jaar'], ['uur', 'dagprofiel']],
   kosten: [['kmaand', 'kjaar'], ['split', 'prognose'], ['vastvar']],
   import: [['import', ['instellingen', 'account']]],
 };
@@ -483,7 +428,7 @@ function loginScherm() {
 async function laad() {
   state.data = null; render();
   const [data, inst] = await Promise.all([store.laadAlles(state.user), store.laadInstellingen(state.user).catch(() => ({}))]);
-  state.data = data; state.instellingen = inst; state.weer = null; state.weerFout = null;
+  state.data = data; state.instellingen = inst;
   render();
 }
 
