@@ -1,22 +1,27 @@
 // Tarieven voor de kostenberekening. Alle bedragen incl. 6% btw tenzij "excl." vermeld.
 // Netbeheerder: Fluvius Limburg, digitale meter, gas "gemiddeld verbruik" (> 5.000 kWh/jaar).
-// Bronnen: Energie.be-tariefkaarten (okt 2024, okt 2025, maart 2026, okt 2026) en de wet energienorm.
+// Bronnen: Energie.be-tariefkaarten (okt 2023, jan 2024, okt 2024, okt 2025, maart 2026, okt 2026) en de wet energienorm.
 
 export const BTW = 1.06;
 
-// Vanaf deze datum wordt gerekend. Apr 2025 – mrt 2026 is gecontroleerd met de jaarafrekening;
-// jan – mrt 2025 (contract 10/24, nettarieven 2025) nog niet.
-export const START = '2025-01-01';
+// Vanaf deze datum wordt gerekend. Gecontroleerd met de jaarafrekeningen:
+// apr 2024 – mrt 2025 (stroom € 717,06 tegen € 718,77, gas € 599,32 tegen € 599,42) en apr 2025 – mrt 2026 (exact).
+export const START = '2024-04-01';
 
 // Energieprijs per contract. Formules zijn excl. btw, index in €/MWh, resultaat in c€/kWh.
 export const CONTRACTEN = {
   stroom: [
+    // 10/23: actief volgens de afrekening van 30-04-2024, loopt tot 15/12/2024. Gebruikt vanaf START.
+    { naam: 'Elektriciteit particulier (variabel) 10/23', van: '2024-04-01', tot: '2024-12-15',
+      prijs: (i) => (0.1058 * i + 1.5) * BTW },
     { naam: 'Elektriciteit particulier (variabel) 10/24', van: '2024-12-16', tot: '2025-12-15',
       prijs: (i) => (0.1058 * i + 1.2) * BTW },
     { naam: 'Elektriciteit particulier (variabel) 10/25', van: '2025-12-16', tot: '2026-12-15',
       prijs: (i) => (0.112 * i + 0.8) * BTW },
   ],
   gas: [
+    { naam: 'Gas particulier (variabel) 10/23', van: '2024-04-01', tot: '2024-12-15',
+      prijs: (i) => (0.1033 * i + 0.6) * BTW },
     { naam: 'Gas particulier (variabel) 10/24', van: '2024-12-16', tot: '2025-12-15',
       prijs: (i) => (0.1010 * i + 0.2) * BTW },
     { naam: 'Gas particulier (variabel) 10/25', van: '2025-12-16', tot: '2026-03-31',
@@ -32,17 +37,19 @@ export const VASTE_VERGOEDING = 35;
 // Nettarieven per kalenderjaar.
 export const NET = {
   stroom: {
+    2024: { afname: 5.39, capaciteit: 41.31, databeheer: 13.95 },
     2025: { afname: 6.80, capaciteit: 51.81, databeheer: 18.56 },
     2026: { afname: 5.75, capaciteit: 51.99, databeheer: 18.92 },
   },
   gas: {
+    2024: { distributie: 1.01, vast: 63.26, transport: 0.1622, databeheer: 13.95 },
     2025: { distributie: 0.94, vast: 70.72, transport: 0.1654, databeheer: 18.56 },
     2026: { distributie: 0.98, vast: 77.46, transport: 0.1654, databeheer: 18.92 },
   },
 };
 
 // Groene stroom (GSC) + WKK, c€/kWh.
-export const GSC_WKK = { 2025: 1.17 + 0.42, 2026: 1.17 + 0.39 };
+export const GSC_WKK = { 2024: 1.21 + 0.42, 2025: 1.17 + 0.42, 2026: 1.17 + 0.39 };
 
 // Heffingen per periode, c€/kWh (accijns + bijdrage op de energie).
 export const HEFFINGEN = {
@@ -52,7 +59,8 @@ export const HEFFINGEN = {
     { van: '2026-11-01', waarde: 42.20 / 10 * BTW },
   ],
   gas: [
-    { van: '0000-00-00', waarde: 0.8724 + 0.1058 },
+    { van: '0000-00-00', waarde: 0.8724 + 0.1057 },
+    { van: '2025-01-01', waarde: 0.8724 + 0.1058 },
     { van: '2026-08-01', waarde: 1.0929 },
   ],
 };
