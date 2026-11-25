@@ -62,13 +62,11 @@ export function gestapeld(kolommen_, fmt, label) {
     let y = H - onder;
     const x = i * breed + (breed - bw) / 2;
     const tot = k.delen.reduce((a, d) => a + (d.waarde || 0), 0);
-    const bovenste = k.delen.findLastIndex((d) => d.waarde);
     k.delen.forEach((d, j) => {
       if (!d.waarde) return;
       const h = (d.waarde / max) * (H - onder - boven);
       y -= h;
-      const r = j === bovenste ? 3 : 0;
-      s += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(0, h - 1).toFixed(1)}" rx="${r}" fill="${d.kleur}"${k.onvolledig ? ' fill-opacity="0.45"' : ''}></rect>`;
+      s += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(0, h - 1).toFixed(1)}" fill="${d.kleur}"${k.onvolledig ? ' fill-opacity="0.45"' : ''}></rect>`;
     });
     if (i % stap === 0) s += `<text x="${(x + bw / 2).toFixed(1)}" y="${H - 4}" class="as">${esc(k.kort)}</text>`;
   });
