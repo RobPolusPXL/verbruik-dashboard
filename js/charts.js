@@ -56,7 +56,7 @@ export function gestapeld(kolommen_, fmt, label) {
   const W = 350, H = 170, onder = 18, boven = 6;
   const max = Math.max(1, ...kolommenLijst.map((k) => k.delen.reduce((a, d) => a + (d.waarde || 0), 0)));
   const breed = W / kolommenLijst.length, bw = breed * 0.72;
-  const stap = Math.ceil(kolommenLijst.length / 10);
+  const stap = Math.ceil(kolommenLijst.length / 12);
   let s = '';
   kolommenLijst.forEach((k, i) => {
     let y = H - onder;
