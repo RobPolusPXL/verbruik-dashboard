@@ -4,9 +4,8 @@
 
 export const BTW = 1.06;
 
-// Vanaf deze datum wordt gerekend. Apr 2025 – mrt 2026 is gecontroleerd met de jaarafrekening;
-// jan – mrt 2025 (contract 10/24, nettarieven 2025) nog niet.
-export const START = '2025-01-01';
+// Vanaf deze datum wordt gerekend (gecontroleerd met de jaarafrekening apr 2025 – apr 2026).
+export const START = '2025-04-01';
 
 // Energieprijs per contract. Formules zijn excl. btw, index in €/MWh, resultaat in c€/kWh.
 export const CONTRACTEN = {
