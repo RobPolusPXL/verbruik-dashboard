@@ -517,10 +517,10 @@ function kostenScherm() {
   ${k ? `<section class="kaart" data-id="split"><div class="kaart-kop"><h2>Waar betaal je voor?</h2></div>${splitBalk(k.split)}</section>` : ''}
   <section class="kaart" data-id="kjaar"><div class="kaart-kop"><h2>Jaar na jaar</h2></div>
     ${gestapeld(perJaar, eur, 'Kosten per jaar, stroom, gas en water gestapeld')}
-    <p class="uitleg">Lichtere staven zijn onvolledige jaren. De kosten worden berekend vanaf april 2025, water vanaf de digitale watermeter.</p></section>
+    <p class="uitleg">Lichtere staven zijn onvolledige jaren. De kosten worden berekend vanaf januari 2025, water vanaf de digitale watermeter.</p></section>
   ${p ? prognoseKaart(p, false) : `<section class="kaart" data-id="prognose"><h2>Verwachte jaarafrekening</h2><p class="uitleg">Vul je maandelijkse voorschot in bij <a href="#/import"><b>Gegevens</b></a> om te zien of je geld terugkrijgt of moet bijbetalen.</p></section>`}
   ${vastVariabelKaart(kosten)}
-  <p class="uitleg los"><b>Contractprijzen:</b> alleen voor Energie.be. <b>Nettarieven:</b> Fluvius Limburg, geldig voor iedereen in die regio. <b>Verbruik:</b> uit je Fluvius-export, voor elke leverancier. Berekend per dag met de tariefkaart van je contract, de gepubliceerde beursindex van de maand en de nettarieven van Fluvius Limburg. April 2025 – maart 2026 is gecontroleerd met je jaarafrekening. <b>Water:</b> tarieven van De Watergroep, nog niet nagekeken tegen een afrekening.</p>`;
+  <p class="uitleg los"><b>Contractprijzen:</b> alleen voor Energie.be. <b>Nettarieven:</b> Fluvius Limburg, geldig voor iedereen in die regio. <b>Verbruik:</b> uit je Fluvius-export, voor elke leverancier. Berekend per dag met de tariefkaart van je contract, de gepubliceerde beursindex van de maand en de nettarieven van Fluvius Limburg. April 2025 – maart 2026 is gecontroleerd met je jaarafrekening, januari – maart 2025 nog niet. <b>Water:</b> tarieven van De Watergroep, nog niet nagekeken tegen een afrekening.</p>`;
 }
 
 function vastVariabelKaart(kosten) {
