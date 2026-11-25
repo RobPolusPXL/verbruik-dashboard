@@ -91,13 +91,14 @@ function kostenVan(maanden) {
   const som = (soort, veld) => maanden.reduce((a, k) => a + (k[soort]?.[veld] ?? 0), 0);
   const deel = (veld) => som('stroom', veld) + som('gas', veld);
   return {
-    stroom: som('stroom', 'totaal'), gas: som('gas', 'totaal'),
+    stroom: som('stroom', 'totaal'), gas: som('gas', 'totaal'), water: som('water', 'totaal'),
     split: [
       { naam: 'Energie', v: deel('energie'), kleur: '#E8EAED' },
       { naam: 'Netkosten', v: deel('net'), kleur: '#8B95A3' },
       { naam: 'Heffingen', v: deel('heffingen'), kleur: '#5B6472' },
       { naam: 'Vast', v: deel('vast'), kleur: '#3A414D' },
-    ],
+      { naam: 'Water', v: som('water', 'totaal'), kleur: KLEUR.water },
+    ].filter((x) => x.v > 0),
   };
 }
 
@@ -469,6 +470,9 @@ function energieScherm(soort) {
 function kostenScherm() {
   const { dagen, pieken } = state.data;
   const kosten = kostenPerMaand(dagen, pieken);
+  // Water erbij per maand (alleen maanden met tarieven en bewoners).
+  const wk = Object.fromEntries(waterKostenPerMaand(dagen, state.instellingen.bewoners).filter((w) => w.totaal != null).map((w) => [w.maand, w]));
+  for (const m of kosten) m.water = wk[m.maand] || null;
   if (!heeftProfiel()) return `${detailKop('Kosten')}<section class="leeg"><h2>Geen kosten voor dit account</h2>
     <p>Voor dit account zijn geen contracten ingesteld. De app toont daarom alleen je verbruik. Kosten worden nooit berekend met de prijzen van iemand anders.</p></section>`;
   if (!kosten.length) return detailKop('Kosten') + leegScherm();
@@ -478,14 +482,14 @@ function kostenScherm() {
   const k = selectie.length ? kostenVan(selectie) : null;
   const kol = selectie.map((m) => ({
     label: maandVol(m.maand), kort: MND[+m.maand.slice(5) - 1][0],
-    delen: [{ naam: 'stroom', waarde: m.stroom?.totaal ?? 0, kleur: KLEUR.stroom }, { naam: 'gas', waarde: m.gas?.totaal ?? 0, kleur: KLEUR.gas }],
+    delen: [{ naam: 'stroom', waarde: m.stroom?.totaal ?? 0, kleur: KLEUR.stroom }, { naam: 'gas', waarde: m.gas?.totaal ?? 0, kleur: KLEUR.gas }, { naam: 'water', waarde: m.water?.totaal ?? 0, kleur: KLEUR.water }],
   }));
   const perJaar = jaren.map((j) => {
     const ms = kosten.filter((m) => m.maand.startsWith(j));
     const kk = kostenVan(ms);
     const volledig = ms.filter((m) => m.stroom && m.gas).length;
     return { label: j, kort: `'${j.slice(2)}`, onvolledig: volledig < 12,
-      delen: [{ naam: 'stroom', waarde: kk.stroom, kleur: KLEUR.stroom }, { naam: 'gas', waarde: kk.gas, kleur: KLEUR.gas }] };
+      delen: [{ naam: 'stroom', waarde: kk.stroom, kleur: KLEUR.stroom }, { naam: 'gas', waarde: kk.gas, kleur: KLEUR.gas }, { naam: 'water', waarde: kk.water, kleur: KLEUR.water }] };
   });
   // Maanden zonder kosten: waarom niet?
   const REDEN = { index: 'de beursindex van die maand is nog niet gepubliceerd', contract: 'er is geen contract voor die periode', tarieven: 'de nettarieven van dat jaar ontbreken' };
@@ -501,10 +505,10 @@ function kostenScherm() {
 
   return `${detailKop('Kosten')}
   ${chips([{ waarde: 'laatste', label: '12 maanden' }, ...jaren.map((j) => ({ waarde: j, label: j }))], (w) => w === keuze, 'kosten-jaar', 'Periode')}
-  ${k ? `<div class="kop-getal"><div class="sub">${esc(titel)}, incl. btw</div><div class="groot">${eur(k.stroom + k.gas)}</div>
-    <div class="legende"><span><i style="background:${KLEUR.stroom}"></i>Stroom ${eur(k.stroom)}</span><span><i style="background:${KLEUR.gas}"></i>Gas ${eur(k.gas)}</span></div></div>` : ''}
+  ${k ? `<div class="kop-getal"><div class="sub">${esc(titel)}, incl. btw</div><div class="groot">${eur(k.stroom + k.gas + k.water)}</div>
+    <div class="legende"><span><i style="background:${KLEUR.stroom}"></i>Stroom ${eur(k.stroom)}</span><span><i style="background:${KLEUR.gas}"></i>Gas ${eur(k.gas)}</span>${k.water ? `<span><i style="background:${KLEUR.water}"></i>Water ${eur(k.water)}</span>` : ''}</div></div>` : ''}
   <section class="kaart" data-id="kmaand"><div class="kaart-kop"><h2>Per maand</h2></div>
-    ${gestapeld(kol, eur, 'Kosten per maand, stroom en gas gestapeld')}
+    ${gestapeld(kol, eur, 'Kosten per maand, stroom, gas en water gestapeld')}
     ${(() => { const c = A.kostenConclusies(selectie); return c ? conclusies([
       { t: `Duurste maand: <b>${maandVol(c.duurst.maand)}</b> (${eur0(c.duurst.eur)}), goedkoopste: <b>${maandVol(c.goedkoopst.maand)}</b> (${eur0(c.goedkoopst.eur)}).` },
       ...(c.winterAandeel != null ? [{ t: `December tot februari zijn samen goed voor <b>${Math.round(c.winterAandeel * 100)}%</b> van je gaskosten in deze periode.` }] : []),
@@ -512,11 +516,11 @@ function kostenScherm() {
     ${ontbrekend.length ? `<p class="uitleg">Niet berekend: ${ontbrekend.map(esc).join(' ')}</p>` : ''}</section>
   ${k ? `<section class="kaart" data-id="split"><div class="kaart-kop"><h2>Waar betaal je voor?</h2></div>${splitBalk(k.split)}</section>` : ''}
   <section class="kaart" data-id="kjaar"><div class="kaart-kop"><h2>Jaar na jaar</h2></div>
-    ${gestapeld(perJaar, eur, 'Kosten per jaar, stroom en gas gestapeld')}
-    <p class="uitleg">Lichtere staven zijn onvolledige jaren. De kosten worden berekend vanaf april 2025.</p></section>
+    ${gestapeld(perJaar, eur, 'Kosten per jaar, stroom, gas en water gestapeld')}
+    <p class="uitleg">Lichtere staven zijn onvolledige jaren. De kosten worden berekend vanaf april 2025, water vanaf de digitale watermeter.</p></section>
   ${p ? prognoseKaart(p, false) : `<section class="kaart" data-id="prognose"><h2>Verwachte jaarafrekening</h2><p class="uitleg">Vul je maandelijkse voorschot in bij <a href="#/import"><b>Gegevens</b></a> om te zien of je geld terugkrijgt of moet bijbetalen.</p></section>`}
   ${vastVariabelKaart(kosten)}
-  <p class="uitleg los"><b>Contractprijzen:</b> alleen voor Energie.be. <b>Nettarieven:</b> Fluvius Limburg, geldig voor iedereen in die regio. <b>Verbruik:</b> uit je Fluvius-export, voor elke leverancier. Berekend per dag met de tariefkaart van je contract, de gepubliceerde beursindex van de maand en de nettarieven van Fluvius Limburg. April 2025 – maart 2026 is gecontroleerd met je jaarafrekening.</p>`;
+  <p class="uitleg los"><b>Contractprijzen:</b> alleen voor Energie.be. <b>Nettarieven:</b> Fluvius Limburg, geldig voor iedereen in die regio. <b>Verbruik:</b> uit je Fluvius-export, voor elke leverancier. Berekend per dag met de tariefkaart van je contract, de gepubliceerde beursindex van de maand en de nettarieven van Fluvius Limburg. April 2025 – maart 2026 is gecontroleerd met je jaarafrekening. <b>Water:</b> tarieven van De Watergroep, nog niet nagekeken tegen een afrekening.</p>`;
 }
 
 function vastVariabelKaart(kosten) {
