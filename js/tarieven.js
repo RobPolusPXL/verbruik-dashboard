@@ -56,6 +56,14 @@ export const HEFFINGEN = {
   ],
 };
 
+// Water: De Watergroep, Zonhoven, huishoudelijk, aangesloten op riolering. Bedragen excl. 6% btw,
+// som van drinkwater + afvoer + zuivering. Bron: dewatergroep.be/tarieven (2026).
+// Basistarief geldt voor 30 m³ per wooneenheid + 30 m³ per gedomicilieerde per jaar, daarboven comforttarief.
+// Nog niet nagekeken tegen een afrekening.
+export const WATER = {
+  2026: { vast: 50 + 30 + 20, korting: 10 + 6 + 4, basis: 2.9251 + 1.9572 + 1.7019, comfort: 5.8502 + 3.9144 + 3.4038 },
+};
+
 // Minimum voor het capaciteitstarief (kW).
 export const MIN_PIEK = 2.5;
 
@@ -64,9 +72,9 @@ export const MIN_PIEK = 2.5;
 // Een account zonder profiel krijgt geen contracten en dus geen kostenberekening, alleen verbruik.
 // Sleutel = SHA-256 van het e-mailadres (zodat het adres niet in de code staat).
 const PROFIELEN = {
-  a7a9e419654b2beba40fe08bee63558e7916a76e0c279bd47bdba0f2ba60615d: { contracten: CONTRACTEN, net: NET, gsc: GSC_WKK },
+  a7a9e419654b2beba40fe08bee63558e7916a76e0c279bd47bdba0f2ba60615d: { contracten: CONTRACTEN, net: NET, gsc: GSC_WKK, water: WATER },
 };
-const LEEG = { contracten: { stroom: [], gas: [] }, net: { stroom: {}, gas: {} }, gsc: {} };
+const LEEG = { contracten: { stroom: [], gas: [] }, net: { stroom: {}, gas: {} }, gsc: {}, water: {} };
 let profiel = LEEG;
 
 export async function kiesProfiel(email, demo = false) {
@@ -85,3 +93,4 @@ export const netVoor = (soort, jaar) => profiel.net[soort][jaar] ?? null;
 export const gscVoor = (jaar) => profiel.gsc[jaar] ?? null;
 export const netTabel = (soort) => profiel.net[soort];
 export const gscTabel = () => profiel.gsc;
+export const waterVoor = (jaar) => profiel.water[jaar] ?? null;

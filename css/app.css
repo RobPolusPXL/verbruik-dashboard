@@ -206,3 +206,9 @@ span.slecht { color: var(--slecht); }
 .week-kol b small { font-size: 11px; color: var(--mute); font-weight: 500; }
 .wk-vorig { font-size: 11px; color: var(--mute); }
 .knoppen { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* Tabel (waterkosten) */
+.tabel { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; margin: 4px 0 8px; }
+.tabel th, .tabel td { text-align: right; padding: 6px 4px; border-bottom: 1px solid rgba(255,255,255,.06); }
+.tabel th:first-child, .tabel td:first-child { text-align: left; }
+.tabel th { font-weight: 500; opacity: .6; font-size: .85em; }

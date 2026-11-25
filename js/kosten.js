@@ -1,6 +1,6 @@
 import { BELPEX_RLP, TTF_RLP } from './indexen.js';
 import {
-  START, VASTE_VERGOEDING, HEFFINGEN, MIN_PIEK, contracten, netVoor, gscVoor, netTabel, gscTabel,
+  BTW, START, VASTE_VERGOEDING, waterVoor, HEFFINGEN, MIN_PIEK, contracten, netVoor, gscVoor, netTabel, gscTabel,
 } from './tarieven.js';
 
 export function contractOp(soort, datum, schatting = false) {
@@ -115,4 +115,32 @@ export function kostenPerMaand(dagen, pieken, { schatting = false } = {}) {
     stroom: M.stroomOk && M.stroom.dagen ? { ...M.stroom, totaal: totaal(M.stroom) } : null,
     gas: M.gasOk && M.gas.dagen ? { ...M.gas, totaal: totaal(M.gas) } : null,
   }));
+}
+
+// Water per maand. Per dag: vastrecht (min korting per bewoner) / dagen in het jaar, en een deel van het
+// jaarlijkse basisvolume (30 m³ + 30 m³ per bewoner). Wat in een maand boven dat deel komt, is comforttarief.
+// Een maand zonder tarieven voor dat jaar, of zonder bewoners, geeft null.
+export function waterKostenPerMaand(dagen, bewoners) {
+  const n = +bewoners || 0;
+  const per = {};
+  for (const d of Object.keys(dagen).sort()) {
+    const wl = dagen[d].wl;
+    if (wl == null) continue;
+    const ym = d.slice(0, 7), j = +d.slice(0, 4);
+    const t = waterVoor(j);
+    const M = (per[ym] ||= { maand: ym, m3: 0, basisRuimte: 0, vast: 0, dagen: 0, ok: !!n });
+    if (!t || !n) { M.ok = false; continue; }
+    const dj = (j % 4 === 0 && (j % 100 !== 0 || j % 400 === 0)) ? 366 : 365;
+    M.m3 += wl / 1000;
+    M.basisRuimte += (30 + 30 * n) / dj;
+    M.vast += (t.vast - t.korting * n) * BTW / dj;
+    M.t = t;
+    M.dagen += 1;
+  }
+  return Object.values(per).map((M) => {
+    if (!M.ok || !M.dagen) return { maand: M.maand, m3: M.m3, totaal: null };
+    const basisM3 = Math.min(M.m3, M.basisRuimte), comfortM3 = M.m3 - basisM3;
+    const verbruik = (basisM3 * M.t.basis + comfortM3 * M.t.comfort) * BTW;
+    return { maand: M.maand, m3: M.m3, basisM3, comfortM3, dagen: M.dagen, vast: M.vast, verbruik, totaal: M.vast + verbruik };
+  });
 }

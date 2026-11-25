@@ -1,7 +1,7 @@
 import * as store from './store.js';
 import { parseFluvius } from './fluvius.js';
 import { parseWater, isWater } from './water.js';
-import { kostenPerMaand, ontbreekt } from './kosten.js';
+import { kostenPerMaand, ontbreekt, waterKostenPerMaand } from './kosten.js';
 import { MIN_PIEK, contracten, netVoor, kiesProfiel, heeftProfiel } from './tarieven.js';
 import * as A from './berekeningen.js';
 import * as P from './plaats.js';
@@ -276,6 +276,20 @@ function persoonKaart(dagen) {
     <p class="uitleg">${Math.abs(pct) < 5 ? 'Ongeveer gemiddeld' : `${f0(Math.abs(pct))}% ${pct < 0 ? 'onder' : 'boven'} het gemiddelde`} voor een gezin van ${n > 5 ? '5 of meer' : n} ${n === 1 ? 'persoon' : 'personen'}. Bron: VMM, kraanwaterverbruik per gezinsgrootte (2022), ${ds.length} dagen gemeten.</p></section>`;
 }
 
+function waterKostKaart(dagen) {
+  if (!heeftProfiel()) return '';
+  const kop = '<div class="kaart-kop"><h2>Kosten</h2><span>De Watergroep</span></div>';
+  const n = +state.instellingen.bewoners || 0;
+  if (!n) return `<section class="kaart" data-id="wkost">${kop}<p class="uitleg">Vul bij <a href="#/import"><b>Gegevens</b></a> het aantal bewoners in. Dat bepaalt hoeveel water aan basistarief telt.</p></section>`;
+  const ms = waterKostenPerMaand(dagen, n);
+  if (!ms.length) return '';
+  const rijen = ms.map((m) => `<tr><td>${maandLang(m.maand)}</td><td>${f2(m.m3)} m³</td><td>${m.totaal == null ? '<span class="uitleg">geen tarieven</span>' : eur(m.totaal)}</td></tr>`).join('');
+  const ok = ms.filter((m) => m.totaal != null);
+  const comfort = ok.some((m) => m.comfortM3 > 0.0005);
+  return `<section class="kaart" data-id="wkost">${kop}
+    <table class="tabel"><thead><tr><th>Maand</th><th>Verbruik</th><th>Kosten</th></tr></thead><tbody>${rijen}</tbody></table>
+    <p class="uitleg">Drinkwater, afvoer en zuivering, incl. vastrecht en 6% btw. Basistarief voor ${30 + 30 * n} m³ per jaar (30 m³ + 30 m³ per bewoner)${comfort ? ', wat erboven komt aan comforttarief' : ', alles valt binnen het basistarief'}. Tarieven ${Object.keys(ok.reduce((a, m) => (a[m.maand.slice(0, 4)] = 1, a), {})).join(', ') || '–'}. <b>Nog niet nagekeken tegen een afrekening.</b></p></section>`;
+}
 
 function lekKaart(wuren) {
   const ds = Object.keys(wuren).sort().slice(-14);
@@ -432,7 +446,7 @@ function energieScherm(soort) {
 
   const uurData = soort === 'gas' ? uren : soort === 'water' ? wuren : suren;
   const uk = uurKaart(soort, uurData, e, soort === 'gas' ? 'm³' : soort === 'water' ? 'l' : 'kWh');
-  if (soort === 'water') extra = lekKaart(wuren) + persoonKaart(dagen);
+  if (soort === 'water') extra = lekKaart(wuren) + persoonKaart(dagen) + waterKostKaart(dagen);
 
   return `${detailKop(e.naam)}
   <div class="kop-getal"><div class="groot" style="color:${e.kleur}">${e.fmt(y.nu)}<small>${e.eenheid}</small></div>
@@ -623,7 +637,7 @@ const INDELING = {
   '': [['herinnering'], ['lekalarm'], ['contractstatus'], ['week'], ['ringen', 'kosten12', 'prognose']],
   stroom: [['jaren'], ['maand', 'jaar'], ['uur', 'dagprofiel'], ['piek', ['sluip', 'dagnacht']], ['drukste']],
   gas: [['jaren', 'jaar'], ['maand', 'temp'], ['uur', 'dagprofiel']],
-  water: [['jaren', 'jaar'], ['maand', ['lek', 'persoon']], ['uur', 'dagprofiel']],
+  water: [['jaren', 'jaar'], ['maand', ['lek', 'persoon']], ['uur', 'dagprofiel'], ['wkost']],
   kosten: [['kmaand', 'kjaar'], ['split', 'prognose'], ['vastvar']],
   import: [['import', ['instellingen', 'plaats', 'account']]],
 };
