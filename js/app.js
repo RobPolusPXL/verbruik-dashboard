@@ -790,7 +790,10 @@ function toonTip(e) {
   el.classList.add('actief');
   tip.textContent = el.dataset.tip;
   tip.hidden = false;
-  const x = Math.min(e.clientX + 12, innerWidth - tip.offsetWidth - 8);
+  // Eerst naar linksboven zetten, anders meet je alleen de restruimte tot de rand (vorige positie).
+  tip.style.left = '0px'; tip.style.top = '0px';
+  const breedte = tip.offsetWidth;
+  const x = e.clientX + 14 + breedte + 8 > innerWidth ? e.clientX - 14 - breedte : e.clientX + 14;
   tip.style.left = Math.max(8, x) + 'px';
   tip.style.top = Math.max(8, e.clientY - tip.offsetHeight - 12) + 'px';
 }
